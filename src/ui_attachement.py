@@ -92,6 +92,7 @@ def generate_intros(source_dir, output_dir, config_data, temp_dir):
             # Base Intro
             intro_clip = VideoFileClip(intro_video_path)
 
+
             # Circular Profile
             with Image.open(profile_path).convert("RGBA") as p_img:
                 size = (min(p_img.size), min(p_img.size))
@@ -107,6 +108,8 @@ def generate_intros(source_dir, output_dir, config_data, temp_dir):
             name_clip = ImageClip(temp_name).set_duration(intro_clip.duration)
             title_clip = ImageClip(temp_title).set_duration(intro_clip.duration)
             vname_clip = ImageClip(temp_vname).set_duration(intro_clip.duration)
+
+
 
             # Positioning
             margin_h = 150
@@ -342,11 +345,11 @@ def run_ui_pipeline(raw_videos_dir, config_path, base_output_dir):
     with open(config_path, 'r') as f:
         config_data = json.load(f)
 
-    # print("--- 1. Generating Intros ---")
-    # generate_intros(raw_videos_dir, intro_output_dir, config_data, temp_dir)
+    print("--- 1. Generating Intros ---")
+    generate_intros(raw_videos_dir, intro_output_dir, config_data, temp_dir)
 
-    # print("--- 2. Stitching Backgrounds ---")
-    # stitch_backgrounds(raw_videos_dir, stitched_output_dir, config_data, temp_dir)
+    print("--- 2. Stitching Backgrounds ---")
+    stitch_backgrounds(raw_videos_dir, stitched_output_dir, config_data, temp_dir)
 
     print("--- 3. Final Concatenation ---")
     concat_final_videos(intro_output_dir, stitched_output_dir, final_output_dir, temp_dir)

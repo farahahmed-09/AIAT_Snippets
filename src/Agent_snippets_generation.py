@@ -65,8 +65,8 @@ def get_llm_response_content(prompt: str) -> Optional[str]:
 def run_preprocessing(
     input_path,
     output_folder,
-    guideline_min_segments=20, # Default mapped from SEGMENTS_PER_CHUNK logic if needed
-    guideline_max_segments=50,
+    guideline_min_segments=10, # Default mapped from SEGMENTS_PER_CHUNK logic if needed
+    guideline_max_segments=15,
     processing_batches=2
 ):
     """
@@ -299,16 +299,34 @@ def call_llm_for_cleansing(batch: List[dict]) -> List[Dict[str, str]]:
         "- The speaker asks: \"So, what is marketing?\" and immediately follows with \"Marketing is the study of...\"\n"
         "- The speaker asks: \"Why does this matter?\" and immediately follows with \"It matters because...\"\n"
         "- RULE: If the question acts as a HEADLINE or TOPIC INTRO, KEEP IT.\n\n"
-        "TYPE B: STUDENT/INTERRUPTION QUESTIONS (MUST REMOVE):\n"
-        "- Questions that signal confusion: \"Sir, I didn't understand that.\"\n"
-        "- Questions that halt the flow: \"Can you repeat the last part?\"\n"
-        "- Questions requiring the instructor to acknowledge an outsider: \"Yes, you have a question?\"\n"
-        "- RULE: If the question disrupts the lesson or asks for repetition, REMOVE IT.\n\n"
-        "### REMOVAL CRITERIA ###\n"
-        "REMOVE a segment ONLY if it contains:\n"
-        "1. Student/Audience Interruptions (e.g., 'Sir...', 'Excuse me...', 'Is this on the test?').\n"
-        "2. Technical checks (e.g., 'Is my screen shared?', 'Can you hear me?').\n"
-        "3. Explicit off-topic chatter (e.g., 'The weather is nice today'—unless it's an analogy).\n\n"
+        # "TYPE B: STUDENT/INTERRUPTION QUESTIONS (MUST REMOVE):\n"
+        # "- Questions that signal confusion: \"Sir, I didn't understand that.\"\n"
+        # "- Questions that halt the flow: \"Can you repeat the last part?\"\n"
+        # "- Questions requiring the instructor to acknowledge an outsider: \"Yes, you have a question?\"\n"
+        # "- RULE: If the question disrupts the lesson or asks for repetition, REMOVE IT.\n\n"
+        # "### REMOVAL CRITERIA ###\n"
+        # "REMOVE a segment ONLY if it contains:\n"
+        # "1. Student/Audience Interruptions (e.g., 'Sir...', 'Excuse me...', 'Is this on the test?').\n"
+        # "2. Technical checks (e.g., 'Is my screen shared?', 'Can you hear me?').\n"
+        # "3. Explicit off-topic chatter (e.g., 'The weather is nice today'—unless it's an analogy).\n\n"
+
+        "TYPE B: STUDENT INTERACTIONS & CLARIFICATIONS (CONDITIONAL):"
+        "- Context-Aware Filtering: Do not blindly remove all student questions. You must evaluate the instructor's response to determine value."
+
+        "### RETENTION CRITERIA (WHEN TO KEEP) ###"
+        "KEEP the question and answer pair ONLY IF the instructor's response provides:"
+        "1. Elaboration: The instructor explains the concept in a new way or adds depth not present in the main lecture flow."
+        "2. Illustration: The instructor provides a specific example, analogy, or case study to clarify the point."
+        "3. Correction: The instructor corrects a common misconception that adds educational value."
+        "- RULE: If the interaction deepens understanding, treat it as part of the core lesson content."
+
+        "### REMOVAL CRITERIA (WHEN TO DELETE) ###"
+        "REMOVE the segment ONLY if it falls into these categories:"
+        "1. Pure Repetition: The question asks to repeat information ('Can you say that again?', 'I missed the last part') and the instructor simply repeats the same words."
+        "2. Logistical/Administrative: Questions regarding exams, timing, or grades ('Is this on the test?', 'Will we get a break?')."
+        "3. Technical/Environmental: Issues with audio, visuals, or surroundings ('Is the screen shared?', 'The font is too small')."
+        "4. Empty Affirmations: Short interactions that do not add content (Student: 'Okay, I see.' Instructor: 'Good.')."
+        "5. CRITICAL TECHNICAL CLEANUP: Strictly filter out any segments that appear to have audio glitches or looping text (e.g., consecutive repeated words like 'going to going to going to'). These are invalid data points and must be discarded."
         "### GOLDEN RULE ###\n"
         "If you are unsure if a question is from the Instructor or a Student, ASSUME IT IS THE INSTRUCTOR and KEEP IT. Only remove if you are 100% sure it is an interruption.\n\n"
         "TRANSCRIPT BATCH:\n"

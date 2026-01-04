@@ -25,7 +25,7 @@ BASE_DIR = r"D:\AIAT_Snippets"
 SAVE_DIRECTORY = os.path.join(BASE_DIR, "user_profile")
 TRANSCRIPT_DIR = r"D:\AIAT_Snippets\input_data\transcript_timestamped.json"
 OUTPUT_FOLDER_PATH = os.path.join(BASE_DIR, "output_data", "Agent_pipeline_output_files")
-CONFIG_FILE = os.path.join(SAVE_DIRECTORY, "config.json")
+CONFIG_FILE = r"D:\AIAT_Snippets\user_profile\config.json"
 
 # Specific paths for Trim/Concat
 # Note: Using the video path you had hardcoded in your previous snippet, 
