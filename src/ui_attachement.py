@@ -6,6 +6,7 @@ import ffmpeg
 import json
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from moviepy.editor import *
+import textwrap
 
 # --- DEFAULTS ---
 # Update these paths to where your fonts actually live locally, or keep them relative
@@ -27,16 +28,25 @@ def make_text_image(text, font_size, text_color, output_path, custom_font_path=N
     if font is None:
         font = ImageFont.load_default()
 
-    # Get bounding box
-    if hasattr(font, 'getbbox'):
-        bbox = font.getbbox(text)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        text_pos = (5, 5)
-    else:
-        text_width = font.getlength(text)
-        text_height = 10
-        text_pos = (10, 0)
+    # # Get bounding box
+    # if hasattr(font, 'getbbox'):
+    #     bbox = font.getbbox(text)
+    #     text_width = bbox[2] - bbox[0]
+    #     text_height = bbox[3] - bbox[1]
+    #     text_pos = (5, 5)
+    # else:
+    #     text_width = font.getlength(text)
+    #     text_height = 10
+    #     text_pos = (10, 0)
+
+
+    # Use textbbox to calculate size (supports multiline)
+    dummy_draw = ImageDraw.Draw(Image.new('RGBA', (1, 1)))
+    bbox = dummy_draw.textbbox((0, 0), text, font=font)
+    
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    text_pos = (5, 5)
 
     img_width = int(text_width) + 20
     img_height = int(text_height) + 20
@@ -84,6 +94,12 @@ def generate_intros(source_dir, output_dir, config_data, temp_dir):
             # Prepare Text
             raw_name = os.path.splitext(filename)[0]
             video_name_text = raw_name.replace("_", " ").title()
+
+
+            # <--- ADD THIS --->
+            # Wrap text if it exceeds 20 characters (adjust 'width' as desired)
+            video_name_text = textwrap.fill(video_name_text, width=50)
+            # <---------------->
 
             make_text_image(name, 35, 'yellow', temp_name, FONT_GILROY_REGULAR)
             make_text_image(title, 35, 'yellow', temp_title, FONT_GILROY_REGULAR)

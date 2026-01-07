@@ -23,14 +23,18 @@ app = FastAPI(title="Config & Transcript API")
 # --- PATH CONFIGURATION ---
 BASE_DIR = r"D:\AIAT_Snippets"
 SAVE_DIRECTORY = os.path.join(BASE_DIR, "user_profile")
-TRANSCRIPT_DIR = r"D:\AIAT_Snippets\input_data\transcript_timestamped.json"
+INPUT_DATA_DIR = os.path.join(BASE_DIR, "input_data") 
+TRANSCRIPT_FILE = os.path.join(INPUT_DATA_DIR, "transcript_timestamped.json")
+
 OUTPUT_FOLDER_PATH = os.path.join(BASE_DIR, "output_data", "Agent_pipeline_output_files")
 CONFIG_FILE = r"D:\AIAT_Snippets\user_profile\config.json"
 
-# Specific paths for Trim/Concat
-# Note: Using the video path you had hardcoded in your previous snippet, 
-# or you can load it dynamically from config.json if preferred.
-VIDEO_SOURCE_PATH = r"D:\AIAT_Snippets\input_data\1750962554.mp4" 
+# 2. Open and load the JSON data
+with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+    config_data = json.load(f)
+
+# 3. Extract the video link
+video_link = config_data["video_link"]
 FINAL_JSON_PATH = r"D:\AIAT_Snippets\output_data\Agent_pipeline_output_files\6-final_results_mapped.json"
 RAW_VIDEO_OUTPUT_DIR = r"D:\AIAT_Snippets\output_data\raw_videos_snippets"
 TEMP_VIDEO_DIR = os.path.join(BASE_DIR, "temp_video_clips")
@@ -89,24 +93,26 @@ async def save_configuration(
 async def generate_transcript():
     try:
         if not os.path.exists(CONFIG_FILE):
-            raise HTTPException(status_code=404, detail="Config file not found. Please run configuration first.")
+            raise HTTPException(status_code=404, detail="Config file not found...")
         
         with open(CONFIG_FILE, "r") as f:
             config = json.load(f)
         
         video_url = config.get("video_link")
         if not video_url:
-            raise HTTPException(status_code=400, detail="No video link found in configuration.")
+            raise HTTPException(status_code=400, detail="No video link found...")
 
-        if not os.path.exists(TRANSCRIPT_DIR):
-            os.makedirs(TRANSCRIPT_DIR)
+        # Ensure directory exists
+        if not os.path.exists(INPUT_DATA_DIR):
+            os.makedirs(INPUT_DATA_DIR)
 
-        # Step A: Download
-        video_file_path = download_video_file(video_url, TRANSCRIPT_DIR)
+        # Step A: Download (Pass the DIRECTORY, not the file path)
+        video_file_path = download_video_file(video_url, INPUT_DATA_DIR)
 
-        # Step B: Transcribe
-        transcript_path = generate_transcript_from_video(video_file_path, TRANSCRIPT_DIR, model_name="medium")
-
+        # Step B: Transcribe (Pass the DIRECTORY)
+        # Note: Your generate_transcript_from_video function automatically adds 
+        # "transcript_timestamped.json" to the directory you pass it.
+        transcript_path = generate_transcript_from_video(video_file_path, INPUT_DATA_DIR, model_name="medium")
         # Update Config with the transcript path so the next step knows where to look
         config['transcript_path'] = transcript_path
         with open(CONFIG_FILE, "w") as f:
@@ -133,13 +139,12 @@ async def run_processing_pipeline():
             os.makedirs(OUTPUT_FOLDER_PATH, exist_ok=True)
             
         # 2. Set Input File (Hardcoded)
-        input_file_path = TRANSCRIPT_DIR
+        input_file_path = TRANSCRIPT_FILE
         
         # Verify it exists
         if not os.path.exists(input_file_path):
              print(f"❌ Error: Transcript file not found at {input_file_path}")
-             raise HTTPException(status_code=400, detail=f"Transcript file not found at: {input_file_path}. Please check the file path.")
-
+             raise HTTPException(status_code=400, detail=f"Transcript file not found...")
         print(f"✅ Found transcript file: {input_file_path}")
 
         # 3. Run Pipeline Steps
@@ -196,8 +201,15 @@ async def trim_and_concat_videos():
         
         # 1. Determine Video Source
         # Ideally, we get this from config.json if the /transcribe step saved it there
-        current_video_path = VIDEO_SOURCE_PATH # Default hardcoded fallback
-        
+        #current_video_path = r"D:\AIAT_Snippets\input_data\1753038424.mp4"# Default hardcoded fallback
+        # Search for .mp4 file in INPUT_DATA_DIR
+        current_video_path = None
+        if os.path.exists(INPUT_DATA_DIR):
+            for file in os.listdir(INPUT_DATA_DIR):
+                if file.endswith(".mp4"):
+                    current_video_path = os.path.join(INPUT_DATA_DIR, file)
+                    break # Stop after finding the first mp4
+                
         if os.path.exists(CONFIG_FILE):
              with open(CONFIG_FILE, 'r') as f:
                  conf = json.load(f)

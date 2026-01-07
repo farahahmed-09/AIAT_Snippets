@@ -91,10 +91,16 @@ def process_video_with_ffmpeg(video_path, json_path, output_dir, temp_dir):
             definition = video_definitions[i]
             vid_title = definition.get('vid_title')
 
+            # if vid_title:
+            #     output_filename = sanitize_filename(vid_title) + ".mp4"
+            # else:
+            #     output_filename = f"generated_video_{i+1}.mp4"
+
             if vid_title:
-                output_filename = sanitize_filename(vid_title) + ".mp4"
+                # Adds "1) ", "2) " prefix to the sanitized filename
+                output_filename = f"{i+1}) {sanitize_filename(vid_title)}.mp4"
             else:
-                output_filename = f"generated_video_{i+1}.mp4"
+                output_filename = f"{i+1}) generated_video.mp4"
 
             timestamps = definition.get('source_segment_timestamps', [])
             output_path = os.path.join(output_dir, output_filename)

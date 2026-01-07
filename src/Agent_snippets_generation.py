@@ -476,18 +476,25 @@ def run_crewai_pipeline(output_folder):
     # --- Task: Conceptual Merging ---
     task_merge = Task(
     description=(
-        f"TASK 3: CONCEPTUAL MERGING.\n"
+        f"TASK 3: CONCEPTUAL MERGING (HIGH VOLUME REQUIRED).\n"
         f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
-        f"Your goal is to identify and merge groups of **4 to 5 segments ONLY** that are strongly related to the **SAME 'concept' or 'idea'**.\n\n"
+        f"Your goal is to identify and merge groups of **6 to 8 segments** to create standalone video scripts.\n\n"
+
+        f"### *** PRIMARY DIRECTIVE: QUANTITY IS CRITICAL ***\n"
+        f"You MUST generate **AT LEAST 8 to 10** merged video outputs. \n"
+        f"Do NOT stop after finding 3 or 4 good matches. You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
+        f"Failure to produce at least 8 outputs is a failed task.\n\n"
 
         f"**CRITICAL MERGING RULES:**\n"
 
-        f"1. **STRICT SEGMENT LIMIT (CRITICAL):** You are ONLY allowed to merge **4 to 5 segments per merged output**. "
-        f"⚠️ It is strictly forbidden to merge fewer than 4 or more than 5 segments. "
-        f"This rule is critical to ensure the final output stays within **400–800 words** and guarantees a **3–5 minute video length**.\n\n"
+        f"1. **STRICT SEGMENT LIMIT:** You are ONLY allowed to merge **6 to 8 segments per merged output**. "
+        f"It is strictly forbidden to merge fewer than 6 or more than 8 segments. "
+        f"This ensures the video length is 4–5 minutes.\n\n"
 
-        f"2. **MINIMUM OUTPUT REQUIREMENT (CRITICAL):** You MUST generate **at least 5 to 10 merged video outputs**. "
-        f"⚠️ You should search on all possible segments to be merged to together \n\n"
+        f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
+        f"To achieve the 8-10 video target, you must look for concepts everywhere. "
+        f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up to the 6-8 segment requirement.\n\n"
+
 
         f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
         f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
@@ -496,6 +503,28 @@ def run_crewai_pipeline(output_folder):
         f"as long as they belong to the **same conceptual topic**.\n\n"
 
         f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications you should take the sgemnet as it is.\n\n"
+
+        f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
+        f"   Before finalizing your selection of 6-8 segments, you MUST perform this analysis:\n\n"
+
+        f"   **A. START BOUNDARY CHECK:**\n"
+        f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
+        f"   - Ask: Does my first segment depend on information, context, or references from that previous segment?\n"
+        f"   - Ask: Does my first segment start mid-explanation, mid-example, or mid-reasoning?\n"
+        f"   - If YES to either: You must INCLUDE that previous segment OR choose a different starting point.\n"
+        f"   - Your first segment must introduce something NEW, not continue something already started.\n\n"
+
+        f"   **B. END BOUNDARY CHECK:**\n"
+        f"   - Look at the segment IMMEDIATELY AFTER your chosen last segment.\n"
+        f"   - Ask: Does my last segment end with an incomplete thought that gets completed in the next segment?\n"
+        f"   - Ask: Does my last segment promise an explanation/example that appears in the next segment?\n"
+        f"   - If YES to either: You must INCLUDE that next segment OR choose a different ending point.\n"
+        f"   - Your last segment must CLOSE a thought, not leave it hanging.\n\n"
+
+        f"7. **SEQUENTIAL CONTEXT AWARENESS:**\n"
+        f"   - When you skip segments (non-sequential merging), you MUST verify that the skipped segments don't contain critical context for your selected segments.\n"
+        f"   - If segment 8 references 'this process' and you skipped segment 7 where 'this process' was explained, you cannot use segment 8.\n"
+        f"   - Always trace backwards: for each segment you select, check if it depends on ANY previous segment you didn't include.\n\n"
 
         f"Input Filtered Segments:\n{json.dumps(input_segments_data, indent=2)}\n\n"
 
