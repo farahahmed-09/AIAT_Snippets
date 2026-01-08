@@ -26,3 +26,7 @@ dist/
 output_data/
 input_data/
 user_profile/
+
+data
+
+node_modules

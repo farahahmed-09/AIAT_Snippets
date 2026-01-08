@@ -9,17 +9,18 @@ from langchain_community.chat_models.litellm import ChatLiteLLM
 
 # 1. Load Environment Variables
 load_dotenv()
-gemini_api_key = os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY")
 
-if not gemini_api_key:
-    print("❌ ERROR: 'GEMINI_API_KEY' not found in environment variables.")
+if not api_key:
+    print("❌ ERROR: 'OPENAI_API_KEY' not found in environment variables.")
 
 # 2. Configure LLM
-llm = ChatLiteLLM(model="gemini/gemini-2.5-pro", api_key=gemini_api_key)
+llm = ChatLiteLLM(model="openai/gpt-o3-pro", api_key=api_key)
 
 # ==========================================
 # 3. HELPER FUNCTIONS
 # ==========================================
+
 
 def load_json(filepath):
     """Loads a JSON file from the given filepath."""
@@ -33,6 +34,7 @@ def load_json(filepath):
         print(f"Error: Could not decode JSON from {filepath}")
         return None
 
+
 def save_json(data, filepath):
     """Saves data to a JSON file at the given filepath."""
     output_dir = os.path.dirname(filepath)
@@ -43,6 +45,7 @@ def save_json(data, filepath):
         print(f"Successfully saved: {filepath}")
     except IOError as e:
         print(f"Error saving JSON file at {filepath}: {e}")
+
 
 def get_llm_response_content(prompt: str) -> Optional[str]:
     """Helper to safely get text content from LLM response."""
@@ -62,10 +65,11 @@ def get_llm_response_content(prompt: str) -> Optional[str]:
 # 4. STEP 1: PREPROCESSING LOGIC
 # ==========================================
 
+
 def run_preprocessing(
     input_path,
     output_folder,
-    guideline_min_segments=10, # Default mapped from SEGMENTS_PER_CHUNK logic if needed
+    guideline_min_segments=10,  # Default mapped from SEGMENTS_PER_CHUNK logic if needed
     guideline_max_segments=15,
     processing_batches=2
 ):
@@ -75,7 +79,8 @@ def run_preprocessing(
     2. BATCHED Segmentation: Split -> Plan -> Merge.
     3. BATCHED Cleansing: Split -> Get Bad IDs + Reasoning -> Remove.
     """
-    print(f"--- Starting Task 1: Pre-processing (Batched Strategy: {processing_batches} loops) ---")
+    print(
+        f"--- Starting Task 1: Pre-processing (Batched Strategy: {processing_batches} loops) ---")
 
     # --- Step 1: Load input and add sequential 'mini_seg_id' ---
     input_data = load_json(input_path)
@@ -91,7 +96,8 @@ def run_preprocessing(
     save_json(mini_segments_with_ids, path_step1)
 
     # --- Step 2: Batched Dynamic Merging ---
-    print(f"--- Starting Step 2: Segmentation (Splitting into {processing_batches} batches) ---")
+    print(
+        f"--- Starting Step 2: Segmentation (Splitting into {processing_batches} batches) ---")
 
     break_points = get_batched_segmentation_plan(
         mini_segments_with_ids,
@@ -104,11 +110,14 @@ def run_preprocessing(
         print("CRITICAL ERROR: Could not generate segmentation plan. Aborting.")
         return False
 
-    merged_input_segments = execute_merge_plan(mini_segments_with_ids, break_points)
+    merged_input_segments = execute_merge_plan(
+        mini_segments_with_ids, break_points)
 
     # Save Step 2 results
-    path_step2_data = os.path.join(output_folder, "2-merged_input_segments.json")
-    path_step2_map = os.path.join(output_folder, "2a-merged_input_mapping.json")
+    path_step2_data = os.path.join(
+        output_folder, "2-merged_input_segments.json")
+    path_step2_map = os.path.join(
+        output_folder, "2a-merged_input_mapping.json")
 
     # Mapping for debugging
     mapping = {
@@ -119,10 +128,12 @@ def run_preprocessing(
     save_json(mapping, path_step2_map)
 
     # --- Step 3: Batched Cleansing (UPDATED) ---
-    print(f"\n--- Starting Step 3: Cleansing (Splitting into {processing_batches} batches) ---")
+    print(
+        f"\n--- Starting Step 3: Cleansing (Splitting into {processing_batches} batches) ---")
 
     # 3.1 Get the Master Removal List (Now containing Reasons)
-    removal_data = run_batched_llm_cleansing(merged_input_segments, num_batches=processing_batches)
+    removal_data = run_batched_llm_cleansing(
+        merged_input_segments, num_batches=processing_batches)
 
     if removal_data is None:
         print("Error during LLM cleansing step. Halting.")
@@ -131,10 +142,12 @@ def run_preprocessing(
     # --- Save the removed IDs AND Reasoning to file ---
     path_removed_ids = os.path.join(output_folder, "removed_segments.json")
     save_json(removal_data, path_removed_ids)
-    print(f"Saved list of {len(removal_data)} removed segments with reasoning to {path_removed_ids}")
+    print(
+        f"Saved list of {len(removal_data)} removed segments with reasoning to {path_removed_ids}")
 
     # 3.2 Filter and Save
-    path_step2b_cleansed = os.path.join(output_folder, "2b-merged_input_segments_cleared.json")
+    path_step2b_cleansed = os.path.join(
+        output_folder, "2b-merged_input_segments_cleared.json")
 
     success = filter_and_save_cleansed(
         input_segments_data=merged_input_segments,
@@ -147,10 +160,12 @@ def run_preprocessing(
 
 # --- Preprocessing Helpers ---
 
+
 def get_batched_segmentation_plan(mini_segments: List[dict], min_guide: int, max_guide: int, num_batches: int) -> List[int]:
     total_segments = len(mini_segments)
-    if total_segments == 0: return []
-    
+    if total_segments == 0:
+        return []
+
     batch_size = math.ceil(total_segments / num_batches)
     all_break_points = []
 
@@ -162,9 +177,11 @@ def get_batched_segmentation_plan(mini_segments: List[dict], min_guide: int, max
         if start_idx >= total_segments:
             break
 
-        current_batch = mini_segments[start_idx : end_idx]
-        print(f"Processing Segmentation Batch {i+1}/{num_batches} (IDs {start_idx} to {end_idx-1})...")
-        batch_breaks = call_llm_for_segmentation(current_batch, min_guide, max_guide)
+        current_batch = mini_segments[start_idx: end_idx]
+        print(
+            f"Processing Segmentation Batch {i+1}/{num_batches} (IDs {start_idx} to {end_idx-1})...")
+        batch_breaks = call_llm_for_segmentation(
+            current_batch, min_guide, max_guide)
         all_break_points.extend(batch_breaks)
 
     all_break_points = sorted(list(set(all_break_points)))
@@ -174,11 +191,13 @@ def get_batched_segmentation_plan(mini_segments: List[dict], min_guide: int, max
 
     return all_break_points
 
+
 def call_llm_for_segmentation(batch: List[dict], min_guide: int, max_guide: int) -> List[int]:
     formatted_lines = []
     for item in batch:
         idx = item['mini_seg_id']
-        text = item.get('text', '').replace('"', "'").replace('\n', ' ').strip()
+        text = item.get('text', '').replace(
+            '"', "'").replace('\n', ' ').strip()
         formatted_lines.append(f"[{idx}] {text}")
 
     batch_text = "\n".join(formatted_lines)
@@ -199,7 +218,8 @@ def call_llm_for_segmentation(batch: List[dict], min_guide: int, max_guide: int)
     )
 
     response_str = get_llm_response_content(prompt)
-    if not response_str: return []
+    if not response_str:
+        return []
 
     try:
         json_match = re.search(r'\[.*\]', response_str, re.DOTALL)
@@ -209,6 +229,7 @@ def call_llm_for_segmentation(batch: List[dict], min_guide: int, max_guide: int)
         return []
     except Exception:
         return []
+
 
 def execute_merge_plan(mini_segments: List[dict], break_points: List[int]) -> List[dict]:
     merged_segments = []
@@ -220,7 +241,7 @@ def execute_merge_plan(mini_segments: List[dict], break_points: List[int]) -> Li
         if slice_end > len(mini_segments):
             slice_end = len(mini_segments)
 
-        chunk = mini_segments[current_start_idx : slice_end]
+        chunk = mini_segments[current_start_idx: slice_end]
         if not chunk:
             current_start_idx = slice_end
             continue
@@ -244,15 +265,18 @@ def execute_merge_plan(mini_segments: List[dict], break_points: List[int]) -> Li
 
     return merged_segments
 
+
 def run_batched_llm_cleansing(merged_segments: List[dict], num_batches: int) -> List[Dict[str, str]]:
     total_segments = len(merged_segments)
-    if total_segments == 0: return []
+    if total_segments == 0:
+        return []
     batch_size = math.ceil(total_segments / num_batches)
 
     all_removal_objects = []
-    seen_ids = set() 
+    seen_ids = set()
 
-    print(f"Total merged segments: {total_segments}. Cleansing Batch size: ~{batch_size}")
+    print(
+        f"Total merged segments: {total_segments}. Cleansing Batch size: ~{batch_size}")
 
     for i in range(num_batches):
         start_idx = i * batch_size
@@ -261,7 +285,7 @@ def run_batched_llm_cleansing(merged_segments: List[dict], num_batches: int) -> 
         if start_idx >= total_segments:
             break
 
-        current_batch = merged_segments[start_idx : end_idx]
+        current_batch = merged_segments[start_idx: end_idx]
         print(f"Processing Cleansing Batch {i+1}/{num_batches}...")
 
         batch_removal_data = call_llm_for_cleansing(current_batch)
@@ -273,12 +297,15 @@ def run_batched_llm_cleansing(merged_segments: List[dict], num_batches: int) -> 
                     seen_ids.add(item['id'])
 
     try:
-        all_removal_objects.sort(key=lambda x: int(x['id'].split('_')[1]) if '_' in x['id'] else 0)
+        all_removal_objects.sort(key=lambda x: int(
+            x['id'].split('_')[1]) if '_' in x['id'] else 0)
     except:
-        pass 
+        pass
 
-    print(f"--- Total segments identified for removal: {len(all_removal_objects)} ---")
+    print(
+        f"--- Total segments identified for removal: {len(all_removal_objects)} ---")
     return all_removal_objects
+
 
 def call_llm_for_cleansing(batch: List[dict]) -> List[Dict[str, str]]:
     formatted_text_list = []
@@ -359,6 +386,7 @@ def call_llm_for_cleansing(batch: List[dict]) -> List[Dict[str, str]]:
         print(f"JSON Parsing Error in cleansing: {e}")
         return []
 
+
 def filter_and_save_cleansed(input_segments_data: List[dict], output_path: str, removal_data: List[Dict[str, str]]):
     ids_to_remove_set = {item['id'] for item in removal_data}
     cleansed_segments = []
@@ -371,7 +399,8 @@ def filter_and_save_cleansed(input_segments_data: List[dict], output_path: str, 
             removed_count += 1
 
     save_json(cleansed_segments, output_path)
-    print(f"Removed {removed_count} segments. Saved {len(cleansed_segments)} segments to {output_path}")
+    print(
+        f"Removed {removed_count} segments. Saved {len(cleansed_segments)} segments to {output_path}")
     return True
 
 
@@ -408,7 +437,8 @@ def run_task_and_clean(agent, task, output_path):
 
         if start_index == -1 or end_index == -1 or end_index <= start_index:
             # Fallback: Check for code block
-            json_block_match = re.search(r'```json\s*(\[.*?\])\s*```', raw_output_string, re.DOTALL)
+            json_block_match = re.search(
+                r'```json\s*(\[.*?\])\s*```', raw_output_string, re.DOTALL)
             if json_block_match:
                 json_str = json_block_match.group(1)
                 print("Found JSON in code block.")
@@ -418,7 +448,7 @@ def run_task_and_clean(agent, task, output_path):
                     f.write(raw_output_string)
                 return None
         else:
-            json_str = raw_output_string[start_index : end_index + 1]
+            json_str = raw_output_string[start_index: end_index + 1]
             print("Found JSON by slicing [ and ].")
 
         parsed_json = json.loads(json_str)
@@ -431,6 +461,7 @@ def run_task_and_clean(agent, task, output_path):
             f.write(raw_output_string)
         return None
 
+
 def run_crewai_pipeline(output_folder):
     """
     Runs the sequential CrewAI tasks (Merge, Finalize)
@@ -438,7 +469,8 @@ def run_crewai_pipeline(output_folder):
     print("--- Starting Tasks: CrewAI Pipeline ---")
 
     # Define File Paths
-    input_segments_path = os.path.join(output_folder, "2b-merged_input_segments_cleared.json")
+    input_segments_path = os.path.join(
+        output_folder, "2b-merged_input_segments_cleared.json")
     merged_path = os.path.join(output_folder, "4-conceptual_merges.json")
     final_path = os.path.join(output_folder, "5-final_results.json")
 
@@ -446,14 +478,15 @@ def run_crewai_pipeline(output_folder):
     input_segments_data = load_json(input_segments_path)
 
     if input_segments_data is None:
-        print(f"Cannot start CrewAI pipeline: '{os.path.basename(input_segments_path)}' not found.")
+        print(
+            f"Cannot start CrewAI pipeline: '{os.path.basename(input_segments_path)}' not found.")
         return False
 
     if not input_segments_data:
         print(f"Warning: Input file is empty. Skipping CrewAI pipeline.")
         save_json([], merged_path)
         save_json([], final_path)
-        return True 
+        return True
 
     # --- The Agent ---
     analyzer_agent = Agent(
@@ -475,78 +508,78 @@ def run_crewai_pipeline(output_folder):
 
     # --- Task: Conceptual Merging ---
     task_merge = Task(
-    description=(
-        f"TASK 3: CONCEPTUAL MERGING (HIGH VOLUME REQUIRED).\n"
-        f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
-        f"Your goal is to identify and merge groups of **6 to 8 segments** to create standalone video scripts.\n\n"
+        description=(
+            f"TASK 3: CONCEPTUAL MERGING (HIGH VOLUME REQUIRED).\n"
+            f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
+            f"Your goal is to identify and merge groups of **6 to 8 segments** to create standalone video scripts.\n\n"
 
-        f"### *** PRIMARY DIRECTIVE: QUANTITY IS CRITICAL ***\n"
-        f"You MUST generate **AT LEAST 8 to 10** merged video outputs. \n"
-        f"Do NOT stop after finding 3 or 4 good matches. You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
-        f"Failure to produce at least 8 outputs is a failed task.\n\n"
+            f"### *** PRIMARY DIRECTIVE: QUANTITY IS CRITICAL ***\n"
+            f"You MUST generate **AT LEAST 8 to 10** merged video outputs. \n"
+            f"Do NOT stop after finding 3 or 4 good matches. You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
+            f"Failure to produce at least 8 outputs is a failed task.\n\n"
 
-        f"**CRITICAL MERGING RULES:**\n"
+            f"**CRITICAL MERGING RULES:**\n"
 
-        f"1. **STRICT SEGMENT LIMIT:** You are ONLY allowed to merge **6 to 8 segments per merged output**. "
-        f"It is strictly forbidden to merge fewer than 6 or more than 8 segments. "
-        f"This ensures the video length is 4–5 minutes.\n\n"
+            f"1. **STRICT SEGMENT LIMIT:** You are ONLY allowed to merge **6 to 8 segments per merged output**. "
+            f"It is strictly forbidden to merge fewer than 6 or more than 8 segments. "
+            f"This ensures the video length is 4–5 minutes.\n\n"
 
-        f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
-        f"To achieve the 8-10 video target, you must look for concepts everywhere. "
-        f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up to the 6-8 segment requirement.\n\n"
+            f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
+            f"To achieve the 8-10 video target, you must look for concepts everywhere. "
+            f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up to the 6-8 segment requirement.\n\n"
 
 
-        f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
-        f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
+            f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
+            f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
 
-        f"4. **NON-SEQUENTIAL MERGING IS ALLOWED:** You MAY merge segments even if they are **not adjacent** or sequential in numbering, "
-        f"as long as they belong to the **same conceptual topic**.\n\n"
+            f"4. **NON-SEQUENTIAL MERGING IS ALLOWED:** You MAY merge segments even if they are **not adjacent** or sequential in numbering, "
+            f"as long as they belong to the **same conceptual topic**.\n\n"
 
-        f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications you should take the sgemnet as it is.\n\n"
+            f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications you should take the sgemnet as it is.\n\n"
 
-        f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
-        f"   Before finalizing your selection of 6-8 segments, you MUST perform this analysis:\n\n"
+            f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
+            f"   Before finalizing your selection of 6-8 segments, you MUST perform this analysis:\n\n"
 
-        f"   **A. START BOUNDARY CHECK:**\n"
-        f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
-        f"   - Ask: Does my first segment depend on information, context, or references from that previous segment?\n"
-        f"   - Ask: Does my first segment start mid-explanation, mid-example, or mid-reasoning?\n"
-        f"   - If YES to either: You must INCLUDE that previous segment OR choose a different starting point.\n"
-        f"   - Your first segment must introduce something NEW, not continue something already started.\n\n"
+            f"   **A. START BOUNDARY CHECK:**\n"
+            f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
+            f"   - Ask: Does my first segment depend on information, context, or references from that previous segment?\n"
+            f"   - Ask: Does my first segment start mid-explanation, mid-example, or mid-reasoning?\n"
+            f"   - If YES to either: You must INCLUDE that previous segment OR choose a different starting point.\n"
+            f"   - Your first segment must introduce something NEW, not continue something already started.\n\n"
 
-        f"   **B. END BOUNDARY CHECK:**\n"
-        f"   - Look at the segment IMMEDIATELY AFTER your chosen last segment.\n"
-        f"   - Ask: Does my last segment end with an incomplete thought that gets completed in the next segment?\n"
-        f"   - Ask: Does my last segment promise an explanation/example that appears in the next segment?\n"
-        f"   - If YES to either: You must INCLUDE that next segment OR choose a different ending point.\n"
-        f"   - Your last segment must CLOSE a thought, not leave it hanging.\n\n"
+            f"   **B. END BOUNDARY CHECK:**\n"
+            f"   - Look at the segment IMMEDIATELY AFTER your chosen last segment.\n"
+            f"   - Ask: Does my last segment end with an incomplete thought that gets completed in the next segment?\n"
+            f"   - Ask: Does my last segment promise an explanation/example that appears in the next segment?\n"
+            f"   - If YES to either: You must INCLUDE that next segment OR choose a different ending point.\n"
+            f"   - Your last segment must CLOSE a thought, not leave it hanging.\n\n"
 
-        f"7. **SEQUENTIAL CONTEXT AWARENESS:**\n"
-        f"   - When you skip segments (non-sequential merging), you MUST verify that the skipped segments don't contain critical context for your selected segments.\n"
-        f"   - If segment 8 references 'this process' and you skipped segment 7 where 'this process' was explained, you cannot use segment 8.\n"
-        f"   - Always trace backwards: for each segment you select, check if it depends on ANY previous segment you didn't include.\n\n"
+            f"7. **SEQUENTIAL CONTEXT AWARENESS:**\n"
+            f"   - When you skip segments (non-sequential merging), you MUST verify that the skipped segments don't contain critical context for your selected segments.\n"
+            f"   - If segment 8 references 'this process' and you skipped segment 7 where 'this process' was explained, you cannot use segment 8.\n"
+            f"   - Always trace backwards: for each segment you select, check if it depends on ANY previous segment you didn't include.\n\n"
 
-        f"Input Filtered Segments:\n{json.dumps(input_segments_data, indent=2)}\n\n"
+            f"Input Filtered Segments:\n{json.dumps(input_segments_data, indent=2)}\n\n"
 
-        f"Your output MUST be a valid JSON list. Each object must have:\n"
-        f"1. 'merged_text': The new smooth-flowing text, created by following the rules above.\n"
-        f"2. 'start': The 'start' time of the *first* segment used.\n"
-        f"3. 'end': The 'end' time of the *last* segment used.\n"
-        f"4. 'big_segments_used': A list of the 'id' strings of all segments used.\n"
-        f"5. 'vid_title': A short, descriptive title that you generate *based on the content* of the 'merged_text'.\n\n"
-        f"6. 'reasoning': i want here the thinking of the llm why he chose these segmnets to be merged together , for example if he choose segmnets [3 5 8 9] i want reason for each segment and i want reason why he decided to jump and dont take [4 6 7]"
+            f"Your output MUST be a valid JSON list. Each object must have:\n"
+            f"1. 'merged_text': The new smooth-flowing text, created by following the rules above.\n"
+            f"2. 'start': The 'start' time of the *first* segment used.\n"
+            f"3. 'end': The 'end' time of the *last* segment used.\n"
+            f"4. 'big_segments_used': A list of the 'id' strings of all segments used.\n"
+            f"5. 'vid_title': A short, descriptive title that you generate *based on the content* of the 'merged_text'.\n\n"
+            f"6. 'reasoning': i want here the thinking of the llm why he chose these segmnets to be merged together , for example if he choose segmnets [3 5 8 9] i want reason for each segment and i want reason why he decided to jump and dont take [4 6 7]"
 
-        f"Example output: [{{"
-        f"'merged_text': '(This is the first segment.) ... In addition to this, ... (This is a related segment.) ...', "
-        f"'start': 10.0, "
-        f"'end': 75.0, "
-        f"'big_segments_used': ['seg_1', 'seg_5', 'seg_7', 'seg_8'], "
-        f"'vid_title': 'A Title Based on the Content'"
-        f"'reasoning': i decided to remove segments .... because of ... , and leave segments ... because of ..."
-        f"}}]"
-    ),
-    agent=analyzer_agent,
-    expected_output="A JSON string list of the conceptually merged segments. ONLY output the JSON list."
+            f"Example output: [{{"
+            f"'merged_text': '(This is the first segment.) ... In addition to this, ... (This is a related segment.) ...', "
+            f"'start': 10.0, "
+            f"'end': 75.0, "
+            f"'big_segments_used': ['seg_1', 'seg_5', 'seg_7', 'seg_8'], "
+            f"'vid_title': 'A Title Based on the Content'"
+            f"'reasoning': i decided to remove segments .... because of ... , and leave segments ... because of ..."
+            f"}}]"
+        ),
+        agent=analyzer_agent,
+        expected_output="A JSON string list of the conceptually merged segments. ONLY output the JSON list."
     )
 
     merged_data = run_task_and_clean(analyzer_agent, task_merge, merged_path)
@@ -566,9 +599,20 @@ def run_crewai_pipeline(output_folder):
             f"ONLY KEEP segments that are 'self-contained'. Discard segments that sound like intros or outros.\n\n"
             f"Input Merged Segments:\n{json.dumps(merged_data, indent=2)}\n\n"
             f"Your output MUST be a valid JSON list containing only the final segments."
+            f"Example output: [{{"
+            f"'merged_text': '(This is the first segment.) ... In addition to this, ... (This is a related segment.) ...', "
+            f"'start': 10.0,"
+            f"'end': 75.0,"
+            f"'big_segments_used': ['seg_1', 'seg_5', 'seg_7', 'seg_8'],"
+            f"'vid_title': 'A Title Based on the Content'"
+            f"'reasoning': i decided to remove segments .... because of ... , and leave segments ... because of ..."
+            f"}}]"
         ),
         agent=analyzer_agent,
-        expected_output="A JSON string list of the final, self-contained segments. ONLY output the JSON list."
+        expected_output="""
+        A JSON string list of the final, self-contained segments. 
+        ONLY output the JSON list.
+        """
     )
 
     final_data = run_task_and_clean(analyzer_agent, task_finalize, final_path)
@@ -593,8 +637,10 @@ def run_postprocessing(output_folder):
     # File paths
     final_results_path = os.path.join(output_folder, "5-final_results.json")
     mapping_path = os.path.join(output_folder, "2a-merged_input_mapping.json")
-    mapping_time_path = os.path.join(output_folder, "2-merged_input_segments.json")
-    final_mapped_path = os.path.join(output_folder, "6-final_results_mapped.json")
+    mapping_time_path = os.path.join(
+        output_folder, "2-merged_input_segments.json")
+    final_mapped_path = os.path.join(
+        output_folder, "6-final_results_mapped.json")
 
     # Load data
     final_results_data = load_json(final_results_path)
@@ -608,7 +654,8 @@ def run_postprocessing(output_folder):
         print("Error: Could not load '2a-merged_input_mapping.json'.")
         return False
     if mapping_time_data is None:
-        print(f"Error: Could not load '{os.path.basename(mapping_time_path)}'.")
+        print(
+            f"Error: Could not load '{os.path.basename(mapping_time_path)}'.")
         return False
 
     # Handle case where no final results were produced
@@ -640,7 +687,8 @@ def run_postprocessing(output_folder):
             mapped_mini_ranges.append(mini_range)
 
             # Look up "seg_1" in the timestamp map
-            timestamp = segment_timestamp_map.get(big_seg_id, "UNKNOWN_TIMESTAMP")
+            timestamp = segment_timestamp_map.get(
+                big_seg_id, "UNKNOWN_TIMESTAMP")
             mapped_timestamps.append(timestamp)
 
         new_segment_data = segment.copy()

@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 6%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 6%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 6%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 263 70% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 217 33% 94%;
+    --muted-foreground: 222 47% 35%;
+
+    --accent: 263 70% 50%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 33% 90%;
+    --input: 217 33% 90%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.75rem;
+
+    /* Custom SmartCut tokens */
+    --glass: 0 0% 100%;
+    --glass-border: 217 33% 85%;
+    --ai-blue: 217 91% 60%;
+    --ai-purple: 263 70% 50%;
+    
+    /* Segment colors */
+    --segment-blue: 217 91% 60%;
+    --segment-green: 142 71% 45%;
+    --segment-purple: 263 70% 50%;
+    --segment-orange: 25 95% 53%;
+    --segment-pink: 330 81% 60%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 6%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 94%;
+    --sidebar-accent-foreground: 222 47% 6%;
+    --sidebar-border: 217 33% 90%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 263 70% 50%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 263 70% 50%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.75rem;
+
+    /* Custom SmartCut tokens */
+    --glass: 222 47% 11%;
+    --glass-border: 217 33% 25%;
+    --ai-blue: 217 91% 60%;
+    --ai-purple: 263 70% 50%;
+    
+    /* Segment colors */
+    --segment-blue: 217 91% 60%;
+    --segment-green: 142 71% 45%;
+    --segment-purple: 263 70% 50%;
+    --segment-orange: 25 95% 53%;
+    --segment-pink: 330 81% 60%;
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-glass-border;
+  }
+  
+  .ai-gradient {
+    background: linear-gradient(135deg, hsl(var(--ai-blue)), hsl(var(--ai-purple)));
+  }
+  
+  .ai-gradient-text {
+    background: linear-gradient(135deg, hsl(var(--ai-blue)), hsl(var(--ai-purple)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}

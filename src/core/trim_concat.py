@@ -8,6 +8,7 @@ import ffmpeg
 # Default config for processing all sections
 CONFIG_SECTIONS_TO_PROCESS = -1
 
+
 def sanitize_filename(name):
     """Converts a string to a safe filename."""
     if not name:
@@ -24,6 +25,7 @@ def sanitize_filename(name):
         return "untitled"
     return name
 
+
 def clean_temp_folder(temp_dir):
     """Deletes and recreates the temporary folder."""
     try:
@@ -34,12 +36,13 @@ def clean_temp_folder(temp_dir):
     except Exception as e:
         print(f"Error: Could not clean temp folder {temp_dir}. {e}")
 
+
 def process_video_with_ffmpeg(video_path, json_path, output_dir, temp_dir):
     """
     Processes a source video based on a JSON file using ffmpeg-python.
     Extracts segments to a temp file, then concatenates them.
     """
-    
+
     # 1. Ensure the output directory exists
     try:
         os.makedirs(output_dir, exist_ok=True)
@@ -75,16 +78,20 @@ def process_video_with_ffmpeg(video_path, json_path, output_dir, temp_dir):
         # 4. Get configuration
         if isinstance(data, dict):
             video_definitions = data.get('video_outputs', [])
-            num_to_process = data.get('config', {}).get('sections_to_process', CONFIG_SECTIONS_TO_PROCESS)
-            if num_to_process == -1: num_to_process = len(video_definitions)
+            num_to_process = data.get('config', {}).get(
+                'sections_to_process', CONFIG_SECTIONS_TO_PROCESS)
+            if num_to_process == -1:
+                num_to_process = len(video_definitions)
         elif isinstance(data, list):
             video_definitions = data
             num_to_process = CONFIG_SECTIONS_TO_PROCESS
-            if num_to_process == -1: num_to_process = len(video_definitions)
+            if num_to_process == -1:
+                num_to_process = len(video_definitions)
         else:
             return False, "Unexpected JSON format. Root is not a dict or a list."
 
-        print(f"Config: Processing {num_to_process} of {len(video_definitions)} total sections.")
+        print(
+            f"Config: Processing {num_to_process} of {len(video_definitions)} total sections.")
 
         # 5. Loop through and process each video section
         for i in range(min(num_to_process, len(video_definitions))):
@@ -122,10 +129,12 @@ def process_video_with_ffmpeg(video_path, json_path, output_dir, temp_dir):
 
                 if start is None or end is None or end <= start:
                     continue
-                
+
                 # Validation against duration
-                if start > video_duration: continue
-                if end > video_duration: end = video_duration
+                if start > video_duration:
+                    continue
+                if end > video_duration:
+                    end = video_duration
 
                 temp_file_path = os.path.join(temp_dir, f"temp_{i}_{j}.mp4")
 
@@ -138,7 +147,8 @@ def process_video_with_ffmpeg(video_path, json_path, output_dir, temp_dir):
                     )
                     temp_file_paths.append(os.path.abspath(temp_file_path))
                 except ffmpeg.Error as e:
-                    print(f"FAILED to extract segment {j+1}: {e.stderr.decode()}")
+                    print(
+                        f"FAILED to extract segment {j+1}: {e.stderr.decode()}")
 
             if not temp_file_paths:
                 continue
@@ -160,7 +170,8 @@ def process_video_with_ffmpeg(video_path, json_path, output_dir, temp_dir):
                 print(f"--- Successfully created {output_filename} ---")
 
             except ffmpeg.Error as e:
-                print(f"Error during FFmpeg CONCATENATION for {output_filename}: {e.stderr.decode()}")
+                print(
+                    f"Error during FFmpeg CONCATENATION for {output_filename}: {e.stderr.decode()}")
 
             # --- STAGE 3: CLEANUP ---
             clean_temp_folder(temp_dir)
