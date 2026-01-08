@@ -16,7 +16,7 @@ export function toPlayableVideoUrl(url?: string | null): string {
 
   // If it's a relative path from our backend, prefix it
   if (url.startsWith("/output/")) {
-    return `${BACKEND_URL}${url}`;
+    return BACKEND_URL ? `${BACKEND_URL}${url}` : url;
   }
 
   if (!url.includes("drive.google.com")) return url;

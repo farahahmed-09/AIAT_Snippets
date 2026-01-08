@@ -1,0 +1,17 @@
+[Unit]
+Description=Snippets FastAPI Application
+After=network.target docker.service snippets-celery.service
+Wants=docker.service snippets-celery.service
+
+[Service]
+Type=simple
+User=sprints-rd
+Group=sprints-rd
+WorkingDirectory=/home/sprints-rd/AIAT_Snippets
+Environment="PATH=/mnt/conda_env/snippets/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/mnt/conda_env/snippets/bin/uvicorn src.app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

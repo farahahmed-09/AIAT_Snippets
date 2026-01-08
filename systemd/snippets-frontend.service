@@ -1,0 +1,15 @@
+[Unit]
+Description=Snippets Frontend Application
+After=network.target
+
+[Service]
+Type=simple
+User=sprints-rd
+Group=sprints-rd
+WorkingDirectory=/home/sprints-rd/AIAT_Snippets/frontend
+ExecStart=/usr/bin/npm run dev -- --host 127.0.0.1 --port 5173
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

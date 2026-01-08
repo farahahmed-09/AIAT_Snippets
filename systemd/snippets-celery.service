@@ -1,0 +1,24 @@
+[Unit]
+Description=Snippets Celery Worker
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=forking
+User=sprints-rd
+Group=sprints-rd
+WorkingDirectory=/home/sprints-rd/AIAT_Snippets
+Environment="PATH=/mnt/conda_env/snippets/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/mnt/conda_env/snippets/bin/celery -A src.app.core.celery_app worker --loglevel=info -Q main-queue,video-queue --detach --pidfile=/var/run/celery/snippets-celery.pid --logfile=/var/log/celery/snippets-celery.log
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=always
+RestartSec=10
+
+# Create runtime directories
+RuntimeDirectory=celery
+RuntimeDirectoryMode=0755
+LogsDirectory=celery
+LogsDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

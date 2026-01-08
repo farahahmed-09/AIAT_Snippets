@@ -21,6 +21,7 @@ This project automates the creation of video snippets from long-form content usi
 - **Redis** (for Celery broker)
 - **FFmpeg** (installed on system path)
 - **Supabase Project** (Database and Storage)
+- **Nginx** (reverse proxy for single exposed port)
 
 ## Architecture
 
@@ -37,7 +38,7 @@ The project is structured as a modular FastAPI application:
 1.  **Activate Environment**:
 
     ```bash
-    conda activate aiat
+    conda activate snippets
     ```
 
 2.  **Install Dependencies**:
@@ -80,10 +81,19 @@ conda run -n snippets celery -A src.app.core.celery_app worker --loglevel=info -
 conda run -n snippets uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+### 4. Start Frontend (Dev)
+
+```bash
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
 ## API Documentation
 
 Once the server is running, visit:
 
+- **Frontend**: [http://localhost:1107](http://localhost:1107)
 - **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
