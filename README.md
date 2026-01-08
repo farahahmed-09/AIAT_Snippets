@@ -70,14 +70,14 @@ This handles heavy background tasks (transcription, AI analysis, video rendering
 
 ```bash
 # From the project root
-conda run -n aiat celery -A src.app.core.celery_app worker --loglevel=info -Q main-queue,video-queue
+conda run -n snippets celery -A src.app.core.celery_app worker --loglevel=info -Q main-queue,video-queue
 ```
 
 ### 3. Start API Server
 
 ```bash
 # From the project root
-conda run -n aiat uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+conda run -n snippets uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## API Documentation
