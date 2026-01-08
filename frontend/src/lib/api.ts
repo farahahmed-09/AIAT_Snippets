@@ -1,6 +1,8 @@
 // SmartCut AI API Client
-
-export const BACKEND_URL = "http://localhost:8000";
+// Prefer env-configured backend to avoid hardcoding deployment URLs.
+export const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://tyson-viceless-starla.ngrok-free.dev/";
 const API_BASE_URL = `${BACKEND_URL}/api/v1`;
 
 // Fetch with timeout helper

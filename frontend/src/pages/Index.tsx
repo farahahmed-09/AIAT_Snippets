@@ -1,15 +1,14 @@
-import { useState, useCallback } from 'react';
-import { Sparkles, Download, LayoutList, Palette } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UploadZone } from '@/components/UploadZone';
-import { VideoPlayer } from '@/components/VideoPlayer';
-import { Timeline } from '@/components/Timeline';
-import { SegmentList } from '@/components/SegmentList';
-import { BrandingTab } from '@/components/BrandingTab';
-import { ExportModal } from '@/components/ExportModal';
-import { Segment, mockSegments, demoVideoUrl } from '@/data/mockData';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { useState, useCallback } from "react";
+import { Sparkles, Download, LayoutList, Palette } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UploadZone } from "@/components/UploadZone";
+import { VideoPlayer } from "@/components/VideoPlayer";
+import { Timeline } from "@/components/Timeline";
+import { SegmentList } from "@/components/SegmentList";
+import { BrandingTab } from "@/components/BrandingTab";
+import { ExportModal } from "@/components/ExportModal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const Index = () => {
   // Video state
@@ -30,9 +29,8 @@ const Index = () => {
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Calculate total duration from segments
-  const totalDuration = segments.length > 0 
-    ? segments[segments.length - 1].endTime 
-    : 720;
+  const totalDuration =
+    segments.length > 0 ? segments[segments.length - 1].endTime : 720;
 
   const handleDemoMode = () => {
     setVideoUrl(demoVideoUrl);
@@ -85,7 +83,9 @@ const Index = () => {
 
   // Show upload zone if no video
   if (!videoUrl) {
-    return <UploadZone onDemoMode={handleDemoMode} onFileUpload={handleFileUpload} />;
+    return (
+      <UploadZone onDemoMode={handleDemoMode} onFileUpload={handleFileUpload} />
+    );
   }
 
   return (
@@ -137,7 +137,10 @@ const Index = () => {
 
         {/* Right Column - Control Center */}
         <div className="lg:w-[40%] glass rounded-2xl p-4 overflow-hidden flex flex-col">
-          <Tabs defaultValue="segments" className="flex-1 flex flex-col overflow-hidden">
+          <Tabs
+            defaultValue="segments"
+            className="flex-1 flex flex-col overflow-hidden"
+          >
             <TabsList className="w-full grid grid-cols-2 mb-4">
               <TabsTrigger value="segments" className="rounded-xl gap-2">
                 <LayoutList className="w-4 h-4" />

@@ -1,15 +1,21 @@
-import { useState } from 'react';
-import { Download, Loader2, CheckCircle, Film, Clock, Sparkles } from 'lucide-react';
+import { useState } from "react";
+import {
+  Download,
+  Loader2,
+  CheckCircle,
+  Film,
+  Clock,
+  Sparkles,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Segment, formatTime, brandingTemplates } from '@/data/mockData';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 interface ExportModalProps {
   open: boolean;
@@ -86,8 +92,12 @@ export const ExportModal = ({
             </div>
             <div className="glass rounded-xl p-4 text-center">
               <Clock className="w-6 h-6 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">{formatTime(totalDuration)}</div>
-              <div className="text-xs text-muted-foreground">Total Duration</div>
+              <div className="text-2xl font-bold">
+                {formatTime(totalDuration)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Total Duration
+              </div>
             </div>
           </div>
 
@@ -96,14 +106,22 @@ export const ExportModal = ({
             <h4 className="text-sm font-medium">Branding</h4>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Intro</span>
-              <span className={introTemplate ? 'text-primary' : 'text-muted-foreground'}>
-                {introTemplate?.name || 'None'}
+              <span
+                className={
+                  introTemplate ? "text-primary" : "text-muted-foreground"
+                }
+              >
+                {introTemplate?.name || "None"}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Outro</span>
-              <span className={outroTemplate ? 'text-primary' : 'text-muted-foreground'}>
-                {outroTemplate?.name || 'None'}
+              <span
+                className={
+                  outroTemplate ? "text-primary" : "text-muted-foreground"
+                }
+              >
+                {outroTemplate?.name || "None"}
               </span>
             </div>
           </div>
@@ -133,7 +151,9 @@ export const ExportModal = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span>Rendering clips...</span>
-                <span className="text-muted-foreground">{Math.round(progress)}%</span>
+                <span className="text-muted-foreground">
+                  {Math.round(progress)}%
+                </span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
@@ -152,8 +172,12 @@ export const ExportModal = ({
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Button variant="outline" onClick={handleClose} className="flex-1 rounded-xl">
-            {isComplete ? 'Close' : 'Cancel'}
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            className="flex-1 rounded-xl"
+          >
+            {isComplete ? "Close" : "Cancel"}
           </Button>
           {!isComplete && (
             <Button

@@ -3,12 +3,6 @@ import { Play, Trash2, GripVertical, Check, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import {
-  Segment,
-  formatTime,
-  getSegmentColor,
-  getSegmentBorderColor,
-} from "@/data/mockData";
 
 interface SegmentListProps {
   segments: Segment[];

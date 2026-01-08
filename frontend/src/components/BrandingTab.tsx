@@ -1,7 +1,6 @@
-import { Check } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { BrandingTemplate, brandingTemplates } from '@/data/mockData';
+import { Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface BrandingTabProps {
   selectedIntro: string | null;
@@ -20,8 +19,8 @@ export const BrandingTab = ({
   applyToAll,
   onApplyToAllChange,
 }: BrandingTabProps) => {
-  const intros = brandingTemplates.filter((t) => t.type === 'intro');
-  const outros = brandingTemplates.filter((t) => t.type === 'outro');
+  const intros = brandingTemplates.filter((t) => t.type === "intro");
+  const outros = brandingTemplates.filter((t) => t.type === "outro");
 
   const TemplateCard = ({
     template,
@@ -36,13 +35,13 @@ export const BrandingTab = ({
       onClick={onClick}
       className={`relative aspect-video rounded-xl overflow-hidden transition-all duration-200 ${
         isSelected
-          ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-          : 'hover:scale-105'
+          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+          : "hover:scale-105"
       }`}
     >
       {/* Gradient Background */}
       <div className={`absolute inset-0 bg-gradient-to-br ${template.color}`} />
-      
+
       {/* Template Name */}
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="text-white text-sm font-medium text-center px-2">
@@ -64,7 +63,9 @@ export const BrandingTab = ({
       {/* Apply to All Toggle */}
       <div className="glass rounded-xl p-4 flex items-center justify-between">
         <div>
-          <Label htmlFor="apply-all" className="font-medium">Apply to all clips</Label>
+          <Label htmlFor="apply-all" className="font-medium">
+            Apply to all clips
+          </Label>
           <p className="text-xs text-muted-foreground mt-1">
             Use selected templates for every exported clip
           </p>
@@ -88,7 +89,11 @@ export const BrandingTab = ({
               key={template.id}
               template={template}
               isSelected={selectedIntro === template.id}
-              onClick={() => onSelectIntro(selectedIntro === template.id ? null : template.id)}
+              onClick={() =>
+                onSelectIntro(
+                  selectedIntro === template.id ? null : template.id
+                )
+              }
             />
           ))}
         </div>
@@ -106,7 +111,11 @@ export const BrandingTab = ({
               key={template.id}
               template={template}
               isSelected={selectedOutro === template.id}
-              onClick={() => onSelectOutro(selectedOutro === template.id ? null : template.id)}
+              onClick={() =>
+                onSelectOutro(
+                  selectedOutro === template.id ? null : template.id
+                )
+              }
             />
           ))}
         </div>

@@ -2,7 +2,6 @@ import { useRef, useEffect, useState } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { formatTime } from "@/data/mockData";
 
 interface VideoPlayerProps {
   videoUrl: string;

@@ -25,7 +25,6 @@ import { toast } from "sonner";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Timeline } from "@/components/Timeline";
 import { SegmentList } from "@/components/SegmentList";
-import { Segment } from "@/data/mockData";
 import { toPlayableVideoUrl } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 

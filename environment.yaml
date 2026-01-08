@@ -1,4 +1,4 @@
-name: myenv
+name: snippets
 channels:
   - conda-forge
   - defaults
