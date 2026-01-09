@@ -107,6 +107,7 @@ function install_services() {
     # Copy service files to systemd directory
     print_info "Copying service files to /etc/systemd/system/..."
     sudo cp "$SCRIPT_DIR/snippets-celery.service" /etc/systemd/system/
+    sudo cp "$SCRIPT_DIR/snippets-beat.service" /etc/systemd/system/
     sudo cp "$SCRIPT_DIR/snippets-api.service" /etc/systemd/system/
     sudo cp "$SCRIPT_DIR/snippets-frontend.service" /etc/systemd/system/
 
@@ -128,6 +129,7 @@ function install_services() {
     # Enable services to start on boot
     print_info "Enabling services to start on boot..."
     sudo systemctl enable snippets-celery.service
+    sudo systemctl enable snippets-beat.service
     sudo systemctl enable snippets-api.service
     sudo systemctl enable snippets-frontend.service
 
@@ -142,16 +144,19 @@ function uninstall_services() {
 
     # Stop services
     sudo systemctl stop snippets-celery.service 2>/dev/null || true
+    sudo systemctl stop snippets-beat.service 2>/dev/null || true
     sudo systemctl stop snippets-api.service 2>/dev/null || true
     sudo systemctl stop snippets-frontend.service 2>/dev/null || true
 
     # Disable services
     sudo systemctl disable snippets-celery.service 2>/dev/null || true
+    sudo systemctl disable snippets-beat.service 2>/dev/null || true
     sudo systemctl disable snippets-api.service 2>/dev/null || true
     sudo systemctl disable snippets-frontend.service 2>/dev/null || true
 
     # Remove service files
     sudo rm -f /etc/systemd/system/snippets-celery.service
+    sudo rm -f /etc/systemd/system/snippets-beat.service
     sudo rm -f /etc/systemd/system/snippets-api.service
     sudo rm -f /etc/systemd/system/snippets-frontend.service
     sudo rm -f /etc/nginx/conf.d/snippets-dev.conf
@@ -186,6 +191,11 @@ function start_services() {
     sudo systemctl start snippets-celery.service
     print_success "Celery worker started"
 
+    # Start Celery Beat scheduler
+    print_info "Starting Celery Beat scheduler..."
+    sudo systemctl start snippets-beat.service
+    print_success "Celery Beat scheduler started"
+
     # Start FastAPI application
     print_info "Starting FastAPI application..."
     sudo systemctl start snippets-api.service
@@ -217,6 +227,11 @@ function stop_services() {
     sudo systemctl stop snippets-celery.service
     print_success "Celery worker stopped"
 
+    # Stop Celery Beat scheduler
+    print_info "Stopping Celery Beat scheduler..."
+    sudo systemctl stop snippets-beat.service
+    print_success "Celery Beat scheduler stopped"
+
     print_success "All services stopped successfully!"
 }
 
@@ -246,6 +261,10 @@ function status_services() {
     systemctl status snippets-celery.service --no-pager || true
     echo ""
 
+    echo "=== Celery Beat Scheduler Status ==="
+    systemctl status snippets-beat.service --no-pager || true
+    echo ""
+
     echo "=== FastAPI Application Status ==="
     systemctl status snippets-api.service --no-pager || true
     echo ""
@@ -265,6 +284,9 @@ function show_logs() {
         celery)
             sudo journalctl -u snippets-celery.service -f
             ;;
+        beat)
+            sudo journalctl -u snippets-beat.service -f
+            ;;
         api)
             sudo journalctl -u snippets-api.service -f
             ;;
@@ -277,7 +299,7 @@ function show_logs() {
             ;;
         *)
         print_error "Unknown service: $SERVICE"
-        print_info "Available services: celery, api, frontend, redis"
+        print_info "Available services: celery, beat, api, frontend, redis"
         exit 1
         ;;
     esac
@@ -296,7 +318,7 @@ Commands:
     stop        Stop all services
     restart     Restart all services
     status      Show status of all services
-    logs        Show logs for a specific service (celery|api|frontend|redis)
+    logs        Show logs for a specific service (celery|beat|api|frontend|redis)
     help        Show this help message
 
 Notes:
@@ -307,7 +329,8 @@ Notes:
 Examples:
     $0 install          # Install services
     $0 start            # Start all services
-    $0 logs celery      # Show Celery logs
+    $0 logs celery      # Show Celery worker logs
+    $0 logs beat        # Show Celery Beat logs
     $0 logs frontend    # Show Frontend logs
     $0 logs redis       # Show Redis container logs
     $0 status           # Check status of all services

@@ -8,6 +8,7 @@ from src.app.services.drive_service import DriveService
 from src.app.services.transcription_service import TranscriptionService
 from src.app.services.agent_service import AgentService
 from src.app.services.video_service import VideoService
+from src.app.services.storage_service import StorageManagementService
 from src.app.core.celery_app import celery_app
 from src.services.supabase import SupabaseService
 
@@ -133,6 +134,14 @@ def process_session_pipeline(self, session_id: int):
             sync_update({"id": session_id}, {"job_status": "Finished"})
             logger.info(
                 f"Session {session_id} pipeline completed successfully.")
+            
+            # NEW: Maintain storage cache after successful pipeline
+            try:
+                storage_service = StorageManagementService()
+                cache_result = run_async(storage_service.maintain_source_video_cache(max_keep=3))
+                logger.info(f"Storage cache maintenance result: {cache_result}")
+            except Exception as e:
+                logger.warning(f"Storage cache maintenance failed: {e}")
         else:
             logger.error(f"Final results file missing at {final_json_path}")
             sync_update({"id": session_id}, {
@@ -174,6 +183,19 @@ def generate_snippet_video(self, snippet_id: int):
         return "Session not found"
 
     try:
+        storage_service = StorageManagementService()
+        
+        # NEW: Restore source video if archived
+        try:
+            session_output_video = os.path.join(settings.OUTPUT_DIR, str(session['id']), "session_video.mp4")
+            if not os.path.exists(session_output_video) or os.path.getsize(session_output_video) < 1000000:
+                if not session.get('source_video_stored'):
+                    logger.info(f"Source video archived, restoring for snippet {snippet_id}...")
+                    await_path = run_async(storage_service.restore_deleted_session_video(session['id']))
+                    logger.info(f"Source video restored at: {await_path}")
+        except Exception as e:
+            logger.warning(f"Failed to restore source video: {e}")
+        
         video_dir = os.path.join(settings.INPUT_DIR, str(session['id']))
         os.makedirs(video_dir, exist_ok=True)
 
@@ -233,4 +255,40 @@ def generate_snippet_video(self, snippet_id: int):
     except Exception as e:
         logger.error(
             f"Snippet generation failed for {snippet_id}: {str(e)}", exc_info=True)
+        return f"Failed: {e}"
+
+
+@celery_app.task
+def cleanup_ephemeral_snippets_task():
+    """
+    Scheduled task: Clean up ephemeral snippet videos older than 1 hour.
+    Runs daily at 2 AM.
+    """
+    logger.info("Starting scheduled cleanup of ephemeral snippets...")
+    try:
+        supabase = SupabaseService()
+        storage_service = StorageManagementService(supabase)
+        result = run_async(storage_service.cleanup_ephemeral_snippets(max_age_hours=1))
+        logger.info(f"Ephemeral snippet cleanup completed: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Ephemeral snippet cleanup failed: {e}", exc_info=True)
+        return f"Failed: {e}"
+
+
+@celery_app.task
+def trim_old_source_videos_task():
+    """
+    Scheduled task: Maintain source video cache by keeping only top 3 accessed videos.
+    Runs daily at 3 AM.
+    """
+    logger.info("Starting scheduled trim of old source videos...")
+    try:
+        supabase = SupabaseService()
+        storage_service = StorageManagementService(supabase)
+        result = run_async(storage_service.maintain_source_video_cache(max_keep=3))
+        logger.info(f"Source video cache maintenance completed: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Source video cache maintenance failed: {e}", exc_info=True)
         return f"Failed: {e}"

@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useMemo } from "react";
 import { ZoomIn, ZoomOut, GripVertical, GripHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { formatTime, getSegmentColor } from "@/lib/utils";
 
 interface TimelineProps {
   segments: Segment[];

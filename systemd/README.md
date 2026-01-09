@@ -12,14 +12,21 @@ This directory contains systemd service files and management scripts for running
 - **Log Location**: `/var/log/celery/snippets-celery.log`
 - **PID File**: `/var/run/celery/snippets-celery.pid`
 
-### 2. `snippets-api.service`
+### 2. `snippets-beat.service`
+
+- **Description**: Celery Beat scheduler for periodic tasks
+- **Dependencies**: Redis, Celery worker
+- **Scheduled Tasks**: Storage cleanup (2 AM), Cache maintenance (3 AM)
+- **Logs**: Viewable via `journalctl -u snippets-beat.service`
+
+### 3. `snippets-api.service`
 
 - **Description**: FastAPI application server
 - **Port**: 8000
 - **Dependencies**: Redis Docker container (managed by the script)
 - **Optional**: Celery worker (for background tasks)
 
-### 3. `snippets-frontend.service`
+### 4. `snippets-frontend.service`
 
 - **Description**: Frontend (Vite dev server)
 - **Port**: 5173 (internal)

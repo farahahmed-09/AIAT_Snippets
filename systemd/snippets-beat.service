@@ -1,0 +1,17 @@
+[Unit]
+Description=Snippets Celery Beat Scheduler
+After=network.target docker.service
+Wants=docker.service snippets-celery.service
+
+[Service]
+Type=simple
+User=sprints-rd
+Group=sprints-rd
+WorkingDirectory=/home/sprints-rd/AIAT_Snippets
+Environment="PATH=/mnt/conda_env/snippets/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/mnt/conda_env/snippets/bin/celery -A src.app.core.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
