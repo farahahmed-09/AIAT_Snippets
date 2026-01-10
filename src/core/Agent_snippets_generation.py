@@ -9,13 +9,17 @@ from langchain_community.chat_models.litellm import ChatLiteLLM
 
 # 1. Load Environment Variables
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 
-if not api_key:
+if not openai_api_key:
     print("❌ ERROR: 'OPENAI_API_KEY' not found in environment variables.")
 
+if not gemini_api_key:
+    print("❌ ERROR: 'GEMINI_API_KEY' not found in environment variables.")
+
 # 2. Configure LLM
-llm = ChatLiteLLM(model="openai/gpt-o3-pro", api_key=api_key)
+llm = ChatLiteLLM(model="gemini/gemini-2.5-pro", api_key=gemini_api_key)
 
 # ==========================================
 # 3. HELPER FUNCTIONS
@@ -493,13 +497,12 @@ def run_crewai_pipeline(output_folder):
         role='Instructional Designer and Script Strategist',
         goal=(
             'Extract singular, powerful learning modules from a long, unstructured lecture. '
-            'Create self-contained scripts that teach exactly one concept per video.'
+            'Create self-contained scripts that teach exactly one concept/idea or example per video.'
         ),
         backstory=(
             "You are an expert instructional designer who converts messy webinars into structured micro-learning courses. "
             "You have a talent for identifying the 'start' and 'end' of a specific topic within a rambling speech. "
             "Your goal is to find clusters of segments that explain a concept fully (Problem -> Explanation -> Solution) "
-            "so that a viewer can watch a 4-minute clip and learn something new without needing the rest of the video."
         ),
         llm=llm,
         verbose=True,
@@ -507,79 +510,89 @@ def run_crewai_pipeline(output_folder):
     )
 
     # --- Task: Conceptual Merging ---
+
     task_merge = Task(
-        description=(
-            f"TASK 3: CONCEPTUAL MERGING (HIGH VOLUME REQUIRED).\n"
-            f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
-            f"Your goal is to identify and merge groups of **6 to 8 segments** to create standalone video scripts.\n\n"
+    description=(
+        f"TASK 3: CONCEPTUAL MERGING (UNRESTRICTED & CONCEPT-DRIVEN).\n"
+        f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
+        f"Your goal is to identify and merge **ALL segments** that underlie a specific concept or idea to create standalone video scripts.\n\n"
 
-            f"### *** PRIMARY DIRECTIVE: QUANTITY IS CRITICAL ***\n"
-            f"You MUST generate **AT LEAST 8 to 10** merged video outputs. \n"
-            f"Do NOT stop after finding 3 or 4 good matches. You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
-            f"Failure to produce at least 8 outputs is a failed task.\n\n"
+        f"### *** PRIMARY DIRECTIVE: CONCEPTUAL COMPLETENESS ***\n"
+        f"You are **FREE** to choose as many segments as needed. There is **NO LIMIT** on the number of segments per video.\n"
+        f"Do NOT artificially split a concept just to keep it short. Do NOT artificially lengthen a concept if it is finished.\n"
+        f"Your priority is to capture the **entire arc** of an idea, from introduction to conclusion.\n\n"
 
-            f"**CRITICAL MERGING RULES:**\n"
+        f"**CRITICAL MERGING RULES:**\n\n"
 
-            f"1. **STRICT SEGMENT LIMIT:** You are ONLY allowed to merge **6 to 8 segments per merged output**. "
-            f"It is strictly forbidden to merge fewer than 6 or more than 8 segments. "
-            f"This ensures the video length is 4–5 minutes.\n\n"
+        f"1. **UNRESTRICTED MERGING SCOPE:** \n"
+        f"   - You MUST merge all segments that belong to the same core topic.\n"
+        f"   - If a concept requires 50 segments to explain fully, use 50 segments.\n"
+        f"   - If a concept is concise and only needs 5 segments, use 5 segments.\n"
+        f"   - **Rule:** The concept dictates the length. Do not worry about word count limits.\n\n"
 
-            f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
-            f"To achieve the 8-10 video target, you must look for concepts everywhere. "
-            f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up to the 6-8 segment requirement.\n\n"
+        f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
+        f"You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
+        f"Aim to generate as many distinct, high-quality video scripts as the source text allows (Target: 5-10 videos if possible, but quality concepts come first).\n"
+        f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up.\n\n"
+
+        f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
+        f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
+
+        f"4. **NON-SEQUENTIAL MERGING IS ALLOWED:** You MAY merge segments even if they are **not adjacent** or sequential in numbering, "
+        f"as long as they belong to the **same conceptual topic**.\n\n"
+
+        f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications. You must take the segment as it is.\n\n"
+
+        f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
+        f"   Before finalizing your selection of the segments, you MUST perform this analysis:\n\n"
 
 
-            f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
-            f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
+        f"7. 'summary_context': A concise summary of exactly what is being explained. "
+        f"CRITICAL REQUIREMENT: You MUST explicitly note if the expert refers to something explained in a previous session or segment "
+        f"(e.g., 'The expert explains [Concept A], while explicitly referencing the definition of [Concept B] from the previous video'). "
+        f"If no reference is made, simply summarize the content.\n\n"
 
-            f"4. **NON-SEQUENTIAL MERGING IS ALLOWED:** You MAY merge segments even if they are **not adjacent** or sequential in numbering, "
-            f"as long as they belong to the **same conceptual topic**.\n\n"
+        f"   **A. START BOUNDARY CHECK:**\n"
+        f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
+        f"   - Ask: Does my first segment depend on information, context, or references from that previous segment?\n"
+        f"   - Ask: Does my first segment start mid-explanation, mid-example, or mid-reasoning?\n"
+        f"   - If YES to either: You must INCLUDE that previous segment OR choose a different starting point.\n"
+        f"   - Your first segment must introduce something NEW, not continue something already started.\n\n"
 
-            f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications you should take the sgemnet as it is.\n\n"
+        f"   **B. END BOUNDARY CHECK:**\n"
+        f"   - Look at the segment IMMEDIATELY AFTER your chosen last segment.\n"
+        f"   - Ask: Does my last segment end with an incomplete thought that gets completed in the next segment?\n"
+        f"   - Ask: Does my last segment promise an explanation/example that appears in the next segment?\n"
+        f"   - If YES to either: You must INCLUDE that next segment OR choose a different ending point.\n"
+        f"   - Your last segment must CLOSE a thought, not leave it hanging.\n\n"
 
-            f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
-            f"   Before finalizing your selection of 6-8 segments, you MUST perform this analysis:\n\n"
+        f"7. **SEQUENTIAL CONTEXT AWARENESS:**\n"
+        f"   - When you skip segments (non-sequential merging), you MUST verify that the skipped segments don't contain critical context for your selected segments.\n"
+        f"   - If segment 8 references 'this process' and you skipped segment 7 where 'this process' was explained, you cannot use segment 8.\n"
+        f"   - Always trace backwards: for each segment you select, check if it depends on ANY previous segment you didn't include.\n\n"
 
-            f"   **A. START BOUNDARY CHECK:**\n"
-            f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
-            f"   - Ask: Does my first segment depend on information, context, or references from that previous segment?\n"
-            f"   - Ask: Does my first segment start mid-explanation, mid-example, or mid-reasoning?\n"
-            f"   - If YES to either: You must INCLUDE that previous segment OR choose a different starting point.\n"
-            f"   - Your first segment must introduce something NEW, not continue something already started.\n\n"
+        f"Input Filtered Segments:\n{json.dumps(input_segments_data, indent=2)}\n\n"
 
-            f"   **B. END BOUNDARY CHECK:**\n"
-            f"   - Look at the segment IMMEDIATELY AFTER your chosen last segment.\n"
-            f"   - Ask: Does my last segment end with an incomplete thought that gets completed in the next segment?\n"
-            f"   - Ask: Does my last segment promise an explanation/example that appears in the next segment?\n"
-            f"   - If YES to either: You must INCLUDE that next segment OR choose a different ending point.\n"
-            f"   - Your last segment must CLOSE a thought, not leave it hanging.\n\n"
+        f"Your output MUST be a valid JSON list. Each object must have:\n"
+        f"1. 'merged_text': The new smooth-flowing text, created by following the rules above.\n"
+        f"2. 'start': The 'start' time of the *first* segment used.\n"
+        f"3. 'end': The 'end' time of the *last* segment used.\n"
+        f"4. 'big_segments_used': A list of the 'id' strings of all segments used.\n"
+        f"5. 'vid_title': A short, descriptive title that you generate *based on the content* of the 'merged_text'.\n\n"
+        f"6. 'reasoning': Detailed explanation of why you grouped these specific segments. Explain why they form a complete thought and explicitly explain why you decided to jump over/exclude specific segments (e.g., 'I excluded segments 4-6 because they shifted to a different sub-topic regarding X...')."
 
-            f"7. **SEQUENTIAL CONTEXT AWARENESS:**\n"
-            f"   - When you skip segments (non-sequential merging), you MUST verify that the skipped segments don't contain critical context for your selected segments.\n"
-            f"   - If segment 8 references 'this process' and you skipped segment 7 where 'this process' was explained, you cannot use segment 8.\n"
-            f"   - Always trace backwards: for each segment you select, check if it depends on ANY previous segment you didn't include.\n\n"
-
-            f"Input Filtered Segments:\n{json.dumps(input_segments_data, indent=2)}\n\n"
-
-            f"Your output MUST be a valid JSON list. Each object must have:\n"
-            f"1. 'merged_text': The new smooth-flowing text, created by following the rules above.\n"
-            f"2. 'start': The 'start' time of the *first* segment used.\n"
-            f"3. 'end': The 'end' time of the *last* segment used.\n"
-            f"4. 'big_segments_used': A list of the 'id' strings of all segments used.\n"
-            f"5. 'vid_title': A short, descriptive title that you generate *based on the content* of the 'merged_text'.\n\n"
-            f"6. 'reasoning': i want here the thinking of the llm why he chose these segmnets to be merged together , for example if he choose segmnets [3 5 8 9] i want reason for each segment and i want reason why he decided to jump and dont take [4 6 7]"
-
-            f"Example output: [{{"
-            f"'merged_text': '(This is the first segment.) ... In addition to this, ... (This is a related segment.) ...', "
-            f"'start': 10.0, "
-            f"'end': 75.0, "
-            f"'big_segments_used': ['seg_1', 'seg_5', 'seg_7', 'seg_8'], "
-            f"'vid_title': 'A Title Based on the Content'"
-            f"'reasoning': i decided to remove segments .... because of ... , and leave segments ... because of ..."
-            f"}}]"
-        ),
-        agent=analyzer_agent,
-        expected_output="A JSON string list of the conceptually merged segments. ONLY output the JSON list."
+        f"Example output: [{{"
+        f"'merged_text': '(This is the first segment.) ... In addition to this, ... (This is a related segment.) ...', "
+        f"'start': 10.0, "
+        f"'end': 300.0, "
+        f"'big_segments_used': ['seg_1', 'seg_2', 'seg_3', 'seg_7', 'seg_8', 'seg_9', 'seg_10', 'seg_11'], "
+        f"'vid_title': 'A Title Based on the Content'"
+        f"'reasoning': I merged these 8 segments because they represent the full definition of [Concept]. Segments 4-6 were removed because they were an unrelated tangent about [Other Topic]. Segments 10-11 were included to fully close the loop on the argument."
+        f"'summary_context': 'The expert defines the 4 Ps of marketing. Note: He explicitly references the case study of Apple discussed in the previous session to illustrate the point....etc'"
+        f"}}]"
+    ),
+    agent=analyzer_agent,
+    expected_output="A JSON string list of the conceptually merged segments. ONLY output the JSON list."
     )
 
     merged_data = run_task_and_clean(analyzer_agent, task_merge, merged_path)
@@ -595,24 +608,13 @@ def run_crewai_pipeline(output_folder):
         description=(
             f"TASK: FINAL FILTERING.\n"
             f"Take this list of conceptually merged segments. Perform a final quality check.\n"
-            f"Make sure each merged segment can form a 3-5 min video (approx 400-800 words).\n"
+            f"Ensure each merged_text is fully self contained and explain core idea/concept. "
             f"ONLY KEEP segments that are 'self-contained'. Discard segments that sound like intros or outros.\n\n"
             f"Input Merged Segments:\n{json.dumps(merged_data, indent=2)}\n\n"
             f"Your output MUST be a valid JSON list containing only the final segments."
-            f"Example output: [{{"
-            f"'merged_text': '(This is the first segment.) ... In addition to this, ... (This is a related segment.) ...', "
-            f"'start': 10.0,"
-            f"'end': 75.0,"
-            f"'big_segments_used': ['seg_1', 'seg_5', 'seg_7', 'seg_8'],"
-            f"'vid_title': 'A Title Based on the Content'"
-            f"'reasoning': i decided to remove segments .... because of ... , and leave segments ... because of ..."
-            f"}}]"
         ),
         agent=analyzer_agent,
-        expected_output="""
-        A JSON string list of the final, self-contained segments. 
-        ONLY output the JSON list.
-        """
+        expected_output="A JSON string list of the final, self-contained segments. ONLY output the JSON list."
     )
 
     final_data = run_task_and_clean(analyzer_agent, task_finalize, final_path)
@@ -621,7 +623,6 @@ def run_crewai_pipeline(output_folder):
 
     print("\n--- CrewAI Pipeline Finished ---")
     return True
-
 
 # ==========================================
 # 6. STEP 3: POSTPROCESSING
