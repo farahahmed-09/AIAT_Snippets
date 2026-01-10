@@ -299,16 +299,6 @@ def call_llm_for_cleansing(batch: List[dict]) -> List[Dict[str, str]]:
         "- The speaker asks: \"So, what is marketing?\" and immediately follows with \"Marketing is the study of...\"\n"
         "- The speaker asks: \"Why does this matter?\" and immediately follows with \"It matters because...\"\n"
         "- RULE: If the question acts as a HEADLINE or TOPIC INTRO, KEEP IT.\n\n"
-        # "TYPE B: STUDENT/INTERRUPTION QUESTIONS (MUST REMOVE):\n"
-        # "- Questions that signal confusion: \"Sir, I didn't understand that.\"\n"
-        # "- Questions that halt the flow: \"Can you repeat the last part?\"\n"
-        # "- Questions requiring the instructor to acknowledge an outsider: \"Yes, you have a question?\"\n"
-        # "- RULE: If the question disrupts the lesson or asks for repetition, REMOVE IT.\n\n"
-        # "### REMOVAL CRITERIA ###\n"
-        # "REMOVE a segment ONLY if it contains:\n"
-        # "1. Student/Audience Interruptions (e.g., 'Sir...', 'Excuse me...', 'Is this on the test?').\n"
-        # "2. Technical checks (e.g., 'Is my screen shared?', 'Can you hear me?').\n"
-        # "3. Explicit off-topic chatter (e.g., 'The weather is nice today'—unless it's an analogy).\n\n"
 
         "TYPE B: STUDENT INTERACTIONS & CLARIFICATIONS (CONDITIONAL):"
         "- Context-Aware Filtering: Do not blindly remove all student questions. You must evaluate the instructor's response to determine value."
@@ -322,11 +312,11 @@ def call_llm_for_cleansing(batch: List[dict]) -> List[Dict[str, str]]:
 
         "### REMOVAL CRITERIA (WHEN TO DELETE) ###"
         "REMOVE the segment ONLY if it falls into these categories:"
-        "1. Pure Repetition: The question asks to repeat information ('Can you say that again?', 'I missed the last part') and the instructor simply repeats the same words."
-        "2. Logistical/Administrative: Questions regarding exams, timing, or grades ('Is this on the test?', 'Will we get a break?')."
-        "3. Technical/Environmental: Issues with audio, visuals, or surroundings ('Is the screen shared?', 'The font is too small')."
-        "4. Empty Affirmations: Short interactions that do not add content (Student: 'Okay, I see.' Instructor: 'Good.')."
-        "5. CRITICAL TECHNICAL CLEANUP: Strictly filter out any segments that appear to have audio glitches or looping text (e.g., consecutive repeated words like 'going to going to going to'). These are invalid data points and must be discarded."
+        "1. Pure Repetition: The question asks to repeat information and the instructor simply repeats the same words."
+        "2. Logistical/Administrative: Questions regarding exams, timing, or grades ."
+        "3. Technical/Environmental: Issues with audio, visuals, or surroundings."
+        "4. Empty Affirmations: Short interactions that do not add content."
+        "5. CRITICAL TECHNICAL CLEANUP: Strictly filter out any segments that appear to have audio glitches or looping text . These are invalid data points and must be discarded."
         "### GOLDEN RULE ###\n"
         "If you are unsure if a question is from the Instructor or a Student, ASSUME IT IS THE INSTRUCTOR and KEEP IT. Only remove if you are 100% sure it is an interruption.\n\n"
         "TRANSCRIPT BATCH:\n"
@@ -460,13 +450,12 @@ def run_crewai_pipeline(output_folder):
         role='Instructional Designer and Script Strategist',
         goal=(
             'Extract singular, powerful learning modules from a long, unstructured lecture. '
-            'Create self-contained scripts that teach exactly one concept per video.'
+            'Create self-contained scripts that teach exactly one concept/idea or example per video.'
         ),
         backstory=(
             "You are an expert instructional designer who converts messy webinars into structured micro-learning courses. "
             "You have a talent for identifying the 'start' and 'end' of a specific topic within a rambling speech. "
             "Your goal is to find clusters of segments that explain a concept fully (Problem -> Explanation -> Solution) "
-            "so that a viewer can watch a 4-minute clip and learn something new without needing the rest of the video."
         ),
         llm=llm,
         verbose=True,
@@ -474,27 +463,30 @@ def run_crewai_pipeline(output_folder):
     )
 
     # --- Task: Conceptual Merging ---
+
     task_merge = Task(
     description=(
-        f"TASK 3: CONCEPTUAL MERGING (HIGH VOLUME REQUIRED).\n"
+        f"TASK 3: CONCEPTUAL MERGING (UNRESTRICTED & CONCEPT-DRIVEN).\n"
         f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
-        f"Your goal is to identify and merge groups of **6 to 8 segments** to create standalone video scripts.\n\n"
+        f"Your goal is to identify and merge **ALL segments** that underlie a specific concept or idea to create standalone video scripts.\n\n"
 
-        f"### *** PRIMARY DIRECTIVE: QUANTITY IS CRITICAL ***\n"
-        f"You MUST generate **AT LEAST 8 to 10** merged video outputs. \n"
-        f"Do NOT stop after finding 3 or 4 good matches. You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
-        f"Failure to produce at least 8 outputs is a failed task.\n\n"
+        f"### *** PRIMARY DIRECTIVE: CONCEPTUAL COMPLETENESS ***\n"
+        f"You are **FREE** to choose as many segments as needed. There is **NO LIMIT** on the number of segments per video.\n"
+        f"Do NOT artificially split a concept just to keep it short. Do NOT artificially lengthen a concept if it is finished.\n"
+        f"Your priority is to capture the **entire arc** of an idea, from introduction to conclusion.\n\n"
 
-        f"**CRITICAL MERGING RULES:**\n"
+        f"**CRITICAL MERGING RULES:**\n\n"
 
-        f"1. **STRICT SEGMENT LIMIT:** You are ONLY allowed to merge **6 to 8 segments per merged output**. "
-        f"It is strictly forbidden to merge fewer than 6 or more than 8 segments. "
-        f"This ensures the video length is 4–5 minutes.\n\n"
+        f"1. **UNRESTRICTED MERGING SCOPE:** \n"
+        f"   - You MUST merge all segments that belong to the same core topic.\n"
+        f"   - If a concept requires 50 segments to explain fully, use 50 segments.\n"
+        f"   - If a concept is concise and only needs 5 segments, use 5 segments.\n"
+        f"   - **Rule:** The concept dictates the length. Do not worry about word count limits.\n\n"
 
         f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
-        f"To achieve the 8-10 video target, you must look for concepts everywhere. "
-        f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up to the 6-8 segment requirement.\n\n"
-
+        f"You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
+        f"Aim to generate as many distinct, high-quality video scripts as the source text allows (Target: 5-10 videos if possible, but quality concepts come first).\n"
+        f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up.\n\n"
 
         f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
         f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
@@ -502,10 +494,16 @@ def run_crewai_pipeline(output_folder):
         f"4. **NON-SEQUENTIAL MERGING IS ALLOWED:** You MAY merge segments even if they are **not adjacent** or sequential in numbering, "
         f"as long as they belong to the **same conceptual topic**.\n\n"
 
-        f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications you should take the sgemnet as it is.\n\n"
+        f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications. You must take the segment as it is.\n\n"
 
         f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
-        f"   Before finalizing your selection of 6-8 segments, you MUST perform this analysis:\n\n"
+        f"   Before finalizing your selection of the segments, you MUST perform this analysis:\n\n"
+
+
+        f"7. 'summary_context': A concise summary of exactly what is being explained. "
+        f"CRITICAL REQUIREMENT: You MUST explicitly note if the expert refers to something explained in a previous session or segment "
+        f"(e.g., 'The expert explains [Concept A], while explicitly referencing the definition of [Concept B] from the previous video'). "
+        f"If no reference is made, simply summarize the content.\n\n"
 
         f"   **A. START BOUNDARY CHECK:**\n"
         f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
@@ -534,15 +532,16 @@ def run_crewai_pipeline(output_folder):
         f"3. 'end': The 'end' time of the *last* segment used.\n"
         f"4. 'big_segments_used': A list of the 'id' strings of all segments used.\n"
         f"5. 'vid_title': A short, descriptive title that you generate *based on the content* of the 'merged_text'.\n\n"
-        f"6. 'reasoning': i want here the thinking of the llm why he chose these segmnets to be merged together , for example if he choose segmnets [3 5 8 9] i want reason for each segment and i want reason why he decided to jump and dont take [4 6 7]"
+        f"6. 'reasoning': Detailed explanation of why you grouped these specific segments. Explain why they form a complete thought and explicitly explain why you decided to jump over/exclude specific segments (e.g., 'I excluded segments 4-6 because they shifted to a different sub-topic regarding X...')."
 
         f"Example output: [{{"
         f"'merged_text': '(This is the first segment.) ... In addition to this, ... (This is a related segment.) ...', "
         f"'start': 10.0, "
-        f"'end': 75.0, "
-        f"'big_segments_used': ['seg_1', 'seg_5', 'seg_7', 'seg_8'], "
+        f"'end': 300.0, "
+        f"'big_segments_used': ['seg_1', 'seg_2', 'seg_3', 'seg_7', 'seg_8', 'seg_9', 'seg_10', 'seg_11'], "
         f"'vid_title': 'A Title Based on the Content'"
-        f"'reasoning': i decided to remove segments .... because of ... , and leave segments ... because of ..."
+        f"'reasoning': I merged these 8 segments because they represent the full definition of [Concept]. Segments 4-6 were removed because they were an unrelated tangent about [Other Topic]. Segments 10-11 were included to fully close the loop on the argument."
+        f"'summary_context': 'The expert defines the 4 Ps of marketing. Note: He explicitly references the case study of Apple discussed in the previous session to illustrate the point....etc'"
         f"}}]"
     ),
     agent=analyzer_agent,
@@ -562,7 +561,7 @@ def run_crewai_pipeline(output_folder):
         description=(
             f"TASK: FINAL FILTERING.\n"
             f"Take this list of conceptually merged segments. Perform a final quality check.\n"
-            f"Make sure each merged segment can form a 3-5 min video (approx 400-800 words).\n"
+            f"Ensure each merged_text is fully self contained and explain core idea/concept. "
             f"ONLY KEEP segments that are 'self-contained'. Discard segments that sound like intros or outros.\n\n"
             f"Input Merged Segments:\n{json.dumps(merged_data, indent=2)}\n\n"
             f"Your output MUST be a valid JSON list containing only the final segments."
