@@ -31,12 +31,26 @@ class SnippetResponse(SnippetBase):
 # --- Session Schemas ---
 
 
+# class SessionBase(BaseModel):
+#     name: str
+#     module: Optional[str] = None
+#     drive_link: Optional[str] = None
+#     video_url: Optional[str] = None
+
 class SessionBase(BaseModel):
     name: str
     module: Optional[str] = None
     drive_link: Optional[str] = None
     video_url: Optional[str] = None
 
+    # --- FIX STARTS HERE ---
+    # Rename these to match the frontend JSON keys exactly
+    speaker_name: Optional[str] = None
+    speaker_title: Optional[str] = None
+    speaker_image_url: Optional[str] = None    # Changed from speaker_image_base64
+    intro_video_url: Optional[str] = None      # Changed from intro_video_base64
+    background_image_url: Optional[str] = None # Changed from background_image_base64
+    # --- FIX ENDS HERE ---
 
 class SessionCreate(SessionBase):
     pass

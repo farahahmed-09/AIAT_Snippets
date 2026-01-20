@@ -62,34 +62,98 @@ async def get_snippet_task_status(task_id: str) -> Any:
     }
 
 
+# @router.get("/snippets/{snippet_id}/download")
+# async def download_snippet(snippet_id: int) -> Any:
+#     """
+#     Download the processed snippet video.
+#     Automatically restores from source if the snippet video was deleted.
+#     """
+#     supabase = SupabaseService()
+#     snippet = await supabase.get(table="snippet", filters={"id": snippet_id})
+#     if not snippet or not snippet.get("storage_link"):
+#         raise HTTPException(
+#             status_code=404, detail="Snippet not found or not yet processed")
+
+#     session_id = snippet['session_id']
+#     filename = snippet['storage_link']
+#     file_path = os.path.join(settings.OUTPUT_DIR, str(
+#         session_id), "snippets", filename)
+
+#     # If file doesn't exist, try to restore it
+#     if not os.path.exists(file_path):
+#         logger.info(f"Snippet file not found at {file_path}, attempting restoration")
+#         storage_service = StorageManagementService(supabase)
+        
+#         try:
+#             # Restore the snippet video from source
+#             await storage_service.restore_deleted_snippet_video(snippet_id)
+#             logger.info(f"Successfully restored snippet {snippet_id}")
+            
+#             # Verify file exists after restoration
+#             if not os.path.exists(file_path):
+#                 logger.error(f"File still not found after restoration: {file_path}")
+#                 raise HTTPException(status_code=404, detail="Failed to restore snippet video")
+#         except Exception as e:
+#             logger.error(f"Failed to restore snippet {snippet_id}: {e}")
+#             raise HTTPException(status_code=500, detail=f"Failed to restore snippet: {str(e)}")
+
+#     # Update access timestamp
+#     try:
+#         storage_service = StorageManagementService(supabase)
+#         await storage_service.update_access_timestamp(session_id)
+#     except Exception as e:
+#         logger.warning(f"Failed to update access timestamp: {e}")
+#         # Don't fail if access tracking fails
+
+#     return FileResponse(
+#         path=file_path,
+#         filename=filename,
+#         media_type='video/mp4'
+#     )
+
+
 @router.get("/snippets/{snippet_id}/download")
 async def download_snippet(snippet_id: int) -> Any:
     """
     Download the processed snippet video.
-    Automatically restores from source if the snippet video was deleted.
+    If storage_link is a URL, redirects to it.
+    If storage_link is a local path, serves the file (restoring if missing).
     """
     supabase = SupabaseService()
     snippet = await supabase.get(table="snippet", filters={"id": snippet_id})
+    
     if not snippet or not snippet.get("storage_link"):
         raise HTTPException(
             status_code=404, detail="Snippet not found or not yet processed")
 
-    session_id = snippet['session_id']
-    filename = snippet['storage_link']
-    file_path = os.path.join(settings.OUTPUT_DIR, str(
-        session_id), "snippets", filename)
+    stored_path = snippet['storage_link']
 
-    # If file doesn't exist, try to restore it
+    # --- NEW: Check if it is a Cloud URL ---
+    if stored_path.startswith("http://") or stored_path.startswith("https://"):
+        # If it's a URL, we simply redirect the user to the Supabase Storage link
+        return RedirectResponse(url=stored_path)
+    # ---------------------------------------
+
+    session_id = snippet['session_id']
+
+    # Handle full path vs filename (Legacy Local File Logic)
+    if os.path.isabs(stored_path):
+        file_path = stored_path
+    else:
+        file_path = os.path.join(settings.OUTPUT_DIR, str(session_id), "snippets", stored_path)
+    
+    download_filename = os.path.basename(file_path)
+
+    # If file doesn't exist locally, try to restore it
     if not os.path.exists(file_path):
         logger.info(f"Snippet file not found at {file_path}, attempting restoration")
+        
         storage_service = StorageManagementService(supabase)
         
         try:
-            # Restore the snippet video from source
             await storage_service.restore_deleted_snippet_video(snippet_id)
             logger.info(f"Successfully restored snippet {snippet_id}")
             
-            # Verify file exists after restoration
             if not os.path.exists(file_path):
                 logger.error(f"File still not found after restoration: {file_path}")
                 raise HTTPException(status_code=404, detail="Failed to restore snippet video")
@@ -103,10 +167,9 @@ async def download_snippet(snippet_id: int) -> Any:
         await storage_service.update_access_timestamp(session_id)
     except Exception as e:
         logger.warning(f"Failed to update access timestamp: {e}")
-        # Don't fail if access tracking fails
 
     return FileResponse(
         path=file_path,
-        filename=filename,
+        filename=download_filename,
         media_type='video/mp4'
     )

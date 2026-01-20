@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import Any, List
 import logging
+import base64   # <--- ADD THIS
+import uuid     # <--- ADD THIS
 
 from src.app.schemas.schemas import SessionCreate, SessionResponse, PlanUpdate, SessionUpdate, SnippetCreate
 from src.app.workers.tasks import process_session_pipeline
@@ -9,6 +11,43 @@ from src.services.supabase import SupabaseService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# --- ADD THIS HELPER FUNCTION ---
+def handle_file_upload(supabase: SupabaseService, file_input: str | None, folder: str) -> str | None:
+    """
+    Checks if input is a Base64 string. 
+    If yes: decodes it, uploads to Supabase Storage, and returns the public URL.
+    If no: assumes it's already a URL and returns it as-is.
+    """
+    if not file_input or not file_input.startswith("data:"):
+        return file_input
+
+    try:
+        # 1. Split metadata from data (e.g., "data:image/png;base64,....")
+        header, encoded = file_input.split(",", 1)
+        
+        # 2. Extract extension (e.g., from "data:image/png;base64")
+        mime_type = header.split(":")[1].split(";")[0]
+        extension = mime_type.split("/")[1]
+        
+        # 3. Decode bytes
+        file_content = base64.b64decode(encoded)
+        
+        # 4. Generate unique filename
+        file_name = f"{uuid.uuid4()}.{extension}"
+        
+        # 5. Upload using your existing SupabaseService method
+        public_url = supabase.upload_file_bytes_to_storage(
+            file_content=file_content,
+            file_name=file_name,
+            folder_path=folder,
+            content_type=mime_type
+        )
+        return public_url
+    except Exception as e:
+        logger.error(f"Failed to upload file for {folder}: {e}")
+        return None
+# --------------------------------
 
 
 @router.post("/upload-session")
@@ -32,13 +71,27 @@ async def upload_session(
             detail="Session with this Drive link already exists."
         )
 
+    # --- FIX STARTS HERE: Process the files before saving ---
+    # This converts the Base64 strings into actual Storage URLs
+    speaker_image_url = handle_file_upload(supabase, session_in.speaker_image_url, "speaker_images")
+    intro_video_url = handle_file_upload(supabase, session_in.intro_video_url, "intro_videos")
+    background_image_url = handle_file_upload(supabase, session_in.background_image_url, "background_images")
+
     # Create Session in DB
     session_data = {
         "name": session_in.name,
         "module": session_in.module,
         "drive_link": session_in.drive_link,
-        "job_status": "Pending"
+        "job_status": "Pending",
+        "speaker_name": session_in.speaker_name,
+        "speaker_title": session_in.speaker_title,
+        
+        # Save the processed URLs, not the Base64 strings
+        "speaker_image_url": speaker_image_url,
+        "intro_video_url": intro_video_url,
+        "background_image_url": background_image_url
     }
+    # --- FIX ENDS HERE ---
 
     new_session = await supabase.create(table="session", data=session_data)
     logger.info(f"Created new session record with ID: {new_session['id']}")

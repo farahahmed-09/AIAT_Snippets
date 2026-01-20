@@ -9,16 +9,21 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from crewai import Agent, Task, Crew, Process
 from langchain_community.chat_models.litellm import ChatLiteLLM
 from src.app.core.config import settings
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
-
+# 1. Load Environment Variables
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 # Configure LLM
 api_key = settings.OPENAI_API_KEY
 if not api_key:
     logger.warning("'OPENAI_API_KEY' not found in settings.")
 
 # Using gpt-4o exactly as in POC
-llm = ChatLiteLLM(model="openai/gpt-4o", api_key=api_key)
+#llm = ChatLiteLLM(model="openai/gpt-4o", api_key=api_key)
+llm = ChatLiteLLM(model="gemini/gemini-2.5-pro", api_key=gemini_api_key)
 
 
 class AgentService:

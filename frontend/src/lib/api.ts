@@ -1,7 +1,9 @@
 // SmartCut AI API Client
 // Prefer env-configured backend to avoid hardcoding deployment URLs.
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
+// export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
+export const BACKEND_URL = "http://127.0.0.1:8000";
 const API_BASE_URL = BACKEND_URL ? `${BACKEND_URL}/api/v1` : "/api/v1";
+
 
 // Fetch with timeout helper
 const fetchWithTimeout = async (
@@ -54,6 +56,12 @@ export interface UploadSessionRequest {
   name: string;
   module?: string;
   drive_link: string;
+  speaker_name?: string;
+  speaker_title?: string;
+  // FIX: Change these back to match the backend Pydantic model
+  speaker_image_url?: string; 
+  intro_video_url?: string;   
+  background_image_url?: string; 
 }
 
 export interface UpdatePlanRequest {

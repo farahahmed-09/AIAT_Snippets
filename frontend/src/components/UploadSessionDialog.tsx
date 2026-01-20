@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Link as LinkIcon } from "lucide-react";
+import { Loader2, Link as LinkIcon, Upload, User, FileVideo, Image as ImageIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Ensure you have these components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +20,95 @@ interface UploadSessionDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// Helper Component for "URL or File" input
+const InputWithUpload = ({ 
+  id, 
+  label, 
+  value, 
+  onChange, 
+  icon: Icon,
+  accept 
+}: { 
+  id: string; 
+  label: string; 
+  value: string; 
+  onChange: (val: string) => void; 
+  icon: any;
+  accept: string;
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Convert to Base64
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onChange(reader.result as string);
+        toast.success("File attached successfully");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const isBase64 = value.startsWith("data:");
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            id={id}
+            placeholder={isBase64 ? "File attached (Base64)" : "Paste URL..."}
+            value={isBase64 ? "File attached" : value}
+            onChange={(e) => !isBase64 && onChange(e.target.value)}
+            className="pl-9"
+            readOnly={isBase64} // Prevent editing text if it's a file
+          />
+        </div>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept={accept} 
+          onChange={handleFileChange} 
+        />
+        <Button 
+          type="button" 
+          variant="outline" 
+          size="icon"
+          title="Upload Local File"
+          onClick={() => isBase64 ? onChange("") : fileInputRef.current?.click()}
+        >
+          {isBase64 ? (
+            <span className="text-red-500 font-bold">X</span>
+          ) : (
+            <Upload className="w-4 h-4" />
+          )}
+        </Button>
+      </div>
+      {isBase64 && <p className="text-xs text-green-600">Local file ready for upload.</p>}
+    </div>
+  );
+};
+
 export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogProps) {
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("basic");
+  
+  // Basic Info
   const [name, setName] = useState("");
   const [module, setModule] = useState("");
   const [driveLink, setDriveLink] = useState("");
+
+  // Branding Info
+  const [speakerName, setSpeakerName] = useState("");
+  const [speakerTitle, setSpeakerTitle] = useState("");
+  const [speakerImage, setSpeakerImage] = useState("");
+  const [introVideo, setIntroVideo] = useState("");
+  const [backgroundImage, setBackgroundImage] = useState("");
 
   const uploadMutation = useMutation({
     mutationFn: () =>
@@ -31,6 +116,13 @@ export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogP
         name,
         module: module || undefined,
         drive_link: driveLink,
+        speaker_name: speakerName || undefined,
+        speaker_title: speakerTitle || undefined,
+        
+        // FIX: Map your state variables to the "_url" keys expected by the backend
+        speaker_image_url: speakerImage || undefined,
+        intro_video_url: introVideo || undefined,
+        background_image_url: backgroundImage || undefined,
       }),
     onSuccess: () => {
       toast.success("Session uploaded! Processing will begin shortly.");
@@ -47,12 +139,18 @@ export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogP
     setName("");
     setModule("");
     setDriveLink("");
+    setSpeakerName("");
+    setSpeakerTitle("");
+    setSpeakerImage("");
+    setIntroVideo("");
+    setBackgroundImage("");
+    setActiveTab("basic");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !driveLink.trim()) {
-      toast.error("Please fill in all required fields");
+      toast.error("Name and Drive Link are required");
       return;
     }
     uploadMutation.mutate();
@@ -60,48 +158,114 @@ export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Upload New Session</DialogTitle>
           <DialogDescription>
-            Provide a Google Drive link to your lecture recording
+            Configure session details and speaker branding.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Session Name *</Label>
-            <Input
-              id="name"
-              placeholder="e.g., Marketing Lecture 1"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="module">Module (optional)</Label>
-            <Input
-              id="module"
-              placeholder="e.g., Marketing 101"
-              value={module}
-              onChange={(e) => setModule(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="drive_link">Google Drive Link *</Label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="drive_link"
-                placeholder="https://drive.google.com/..."
-                value={driveLink}
-                onChange={(e) => setDriveLink(e.target.value)}
-                className="pl-9"
-                required
+
+        <form onSubmit={handleSubmit}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="branding">Speaker & Branding</TabsTrigger>
+            </TabsList>
+
+            {/* --- TAB 1: BASIC INFO --- */}
+            <TabsContent value="basic" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Session Name *</Label>
+                <Input
+                  id="name"
+                  placeholder="e.g., Marketing Lecture 1"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="module">Module (optional)</Label>
+                <Input
+                  id="module"
+                  placeholder="e.g., Marketing 101"
+                  value={module}
+                  onChange={(e) => setModule(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="drive_link">Google Drive Link *</Label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="drive_link"
+                    placeholder="https://drive.google.com/..."
+                    value={driveLink}
+                    onChange={(e) => setDriveLink(e.target.value)}
+                    className="pl-9"
+                    required
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* --- TAB 2: BRANDING --- */}
+            <TabsContent value="branding" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="speaker_name">Speaker Name</Label>
+                  <Input
+                    id="speaker_name"
+                    placeholder="John Doe"
+                    value={speakerName}
+                    onChange={(e) => setSpeakerName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="speaker_title">Speaker Title</Label>
+                  <Input
+                    id="speaker_title"
+                    placeholder="Prof. of Economics"
+                    value={speakerTitle}
+                    onChange={(e) => setSpeakerTitle(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Profile Pic Input */}
+              <InputWithUpload
+                id="speaker_image"
+                label="Profile Picture (URL or Upload)"
+                value={speakerImage}
+                onChange={setSpeakerImage}
+                icon={User}
+                accept="image/*"
               />
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
+
+              {/* Intro Video Input */}
+              <InputWithUpload
+                id="intro_video"
+                label="Intro Video (URL or Upload)"
+                value={introVideo}
+                onChange={setIntroVideo}
+                icon={FileVideo}
+                accept="video/*"
+              />
+
+              {/* Background Image Input */}
+              <InputWithUpload
+                id="background_image"
+                label="Background Image (URL or Upload)"
+                value={backgroundImage}
+                onChange={setBackgroundImage}
+                icon={ImageIcon}
+                accept="image/*"
+              />
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-end gap-3 pt-6">
             <Button
               type="button"
               variant="ghost"

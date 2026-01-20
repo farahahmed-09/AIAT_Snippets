@@ -236,18 +236,24 @@ def generate_snippet_video(self, snippet_id: int):
             json.dump(plan, f)
 
         logger.info(f"Processing video for snippet {snippet_id}...")
+        # FIX: Pass snippet_id=snippet['id'] so VideoService updates the correct DB row
         success, msg = VideoService.process_video_with_ffmpeg(
-            video_path, plan_path, output_dir, temp_dir)
+            video_path, plan_path, output_dir, temp_dir, session['id'], supabase, snippet_id=snippet['id'])
+
+
 
         if success:
-            # Filename is generated as "1) {sanitized_title}.mp4" because we have only one output in plan
-            sanitized_title = VideoService.sanitize_filename(snippet['name'])
-            filename = f"1) {sanitized_title}.mp4"
-            # Update storage_link in DB
-            run_async(supabase.update(table="snippet", filters={
-                      "id": snippet_id}, updates={"storage_link": filename}))
-            logger.info(
-                f"Updated snippet {snippet_id} storage_link to {filename}")
+            # # Filename is generated as "1) {sanitized_title}.mp4" because we have only one output in plan
+            # sanitized_title = VideoService.sanitize_filename(snippet['name'])
+            # filename = f"1) {sanitized_title}.mp4"
+            # # Update storage_link in DB
+            # run_async(supabase.update(table="snippet", filters={
+            #           "id": snippet_id}, updates={"storage_link": filename}))
+            # logger.info(
+            #     f"Updated snippet {snippet_id} storage_link to {filename}")
+            pass
+        else:
+            print("FAILEDDDD")
 
         logger.info(f"Snippet {snippet_id} generation result: {msg}")
         return msg

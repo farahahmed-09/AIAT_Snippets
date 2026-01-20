@@ -36,7 +36,10 @@ export const ExportModal = ({
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  // Moved this hook up to keep state declarations together
+  const [downloadChoice, setDownloadChoice] = useState<string | null>(null);
 
+  // Ensure 'brandingTemplates' is imported or defined in your parent/context
   const introTemplate = brandingTemplates.find((t) => t.id === selectedIntro);
   const outroTemplate = brandingTemplates.find((t) => t.id === selectedOutro);
 
@@ -70,6 +73,14 @@ export const ExportModal = ({
     onOpenChange(false);
   };
 
+  // Function to handle the user's choice
+  const handleDownloadChoice = (choice: string) => {
+    setDownloadChoice(choice);
+    // Proceed with the chosen option
+    // You can now call the backend API based on this choice
+    console.log(`User chose to download: ${choice}`);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="glass border-glass-border sm:max-w-lg">
@@ -84,126 +95,50 @@ export const ExportModal = ({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="glass rounded-xl p-4 text-center">
-              <Film className="w-6 h-6 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">{segments.length}</div>
-              <div className="text-xs text-muted-foreground">Clips</div>
-            </div>
-            <div className="glass rounded-xl p-4 text-center">
-              <Clock className="w-6 h-6 mx-auto mb-2 text-primary" />
-              <div className="text-2xl font-bold">
-                {formatTime(totalDuration)}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Total Duration
-              </div>
-            </div>
-          </div>
-
-          {/* Branding Summary */}
-          <div className="glass rounded-xl p-4 space-y-2">
-            <h4 className="text-sm font-medium">Branding</h4>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Intro</span>
-              <span
-                className={
-                  introTemplate ? "text-primary" : "text-muted-foreground"
-                }
-              >
-                {introTemplate?.name || "None"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Outro</span>
-              <span
-                className={
-                  outroTemplate ? "text-primary" : "text-muted-foreground"
-                }
-              >
-                {outroTemplate?.name || "None"}
-              </span>
-            </div>
-          </div>
-
-          {/* Clips List */}
-          <div className="glass rounded-xl p-4">
-            <h4 className="text-sm font-medium mb-3">Clips to Render</h4>
-            <div className="space-y-2 max-h-32 overflow-y-auto">
-              {segments.map((segment, index) => (
-                <div
-                  key={segment.id}
-                  className="flex items-center justify-between text-sm py-1"
+          {/* Add the choice dialog */}
+          {!downloadChoice && (
+            <div className="glass rounded-xl p-4">
+              <h4 className="text-sm font-medium">Choose Download Option</h4>
+              <div className="flex justify-between mt-4">
+                <Button 
+                  onClick={() => handleDownloadChoice("separate")}
+                  variant="outline"
                 >
-                  <span className="text-muted-foreground">
-                    {index + 1}. {segment.topic}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatTime(segment.endTime - segment.startTime)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Progress or Complete State */}
-          {isExporting && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Rendering clips...</span>
-                <span className="text-muted-foreground">
-                  {Math.round(progress)}%
-                </span>
+                  Separate Snippets
+                </Button>
+                <Button 
+                  onClick={() => handleDownloadChoice("merged")}
+                  variant="outline"
+                >
+                  Merged Highlight Video
+                </Button>
               </div>
-              <Progress value={progress} className="h-2" />
             </div>
           )}
 
-          {isComplete && (
-            <div className="glass rounded-xl p-4 text-center">
-              <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-500" />
-              <h4 className="font-semibold mb-1">Export Complete!</h4>
-              <p className="text-sm text-muted-foreground">
-                Your {segments.length} clips are ready for download
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            className="flex-1 rounded-xl"
-          >
-            {isComplete ? "Close" : "Cancel"}
-          </Button>
-          {!isComplete && (
-            <Button
-              onClick={handleExport}
-              disabled={isExporting || segments.length === 0}
-              className="flex-1 rounded-xl ai-gradient"
-            >
-              {isExporting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Rendering...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export All
-                </>
+          {/* If user has made a choice, show the export button */}
+          {downloadChoice && (
+            <div>
+              {/* Optional: Show progress bar if exporting */}
+              {isExporting && (
+                <div className="mb-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Exporting...</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                  <Progress value={progress} />
+                </div>
               )}
-            </Button>
-          )}
-          {isComplete && (
-            <Button className="flex-1 rounded-xl ai-gradient">
-              <Download className="w-4 h-4 mr-2" />
-              Download All
-            </Button>
+              
+              <Button
+                onClick={handleExport}
+                disabled={isExporting || segments.length === 0}
+                className="w-full rounded-xl ai-gradient flex items-center justify-center gap-2"
+              >
+                {isExporting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Export {downloadChoice === "separate" ? "Snippets" : "Merged Video"}
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

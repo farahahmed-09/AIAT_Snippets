@@ -4,7 +4,7 @@ import os
 import json
 
 # Configuration
-API_BASE = "http://127.0.0.1:8000"
+API_BASE = "http://127.0.0.1:5173"
 CONFIG_FILE_PATH = r"D:\AIAT_Snippets\user_profile\config.json"
 TRANSCRIPT_PATH = r"D:\AIAT_Snippets\input_data\transcript_timestamped.json"
 FINAL_JSON_PATH = r"D:\AIAT_Snippets\output_data\Agent_pipeline_output_files\6-final_results_mapped.json"
