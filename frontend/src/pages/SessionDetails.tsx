@@ -237,6 +237,119 @@ export default function SessionDetails() {
     window.open(downloadUrl, "_blank", "noopener");
   };
 
+
+
+  // const handleDownloadAll = async () => {
+  //   try {
+  //     toast.info("Starting batch processing... Please allow multiple downloads if prompted.");
+      
+  //     // 1. Call the backend to trigger tasks and get the list
+  //     const response = await sessionsApi.downloadAllSnippets(sessionId);
+      
+  //     if (response.results.length === 0) {
+  //       toast.warning("No snippets found to download.");
+  //       return;
+  //     }
+
+  //     toast.success(`Processing ${response.results.length} snippets. Downloads will start shortly.`);
+
+  //     // 2. Loop through results and trigger individual downloads
+  //     for (const result of response.results) {
+  //       const url = getSnippetDownloadUrl(result.snippet_id);
+        
+  //       // Create a temporary hidden link to force download
+  //       const link = document.createElement('a');
+  //       link.href = url;
+  //       link.download = ''; // Let the browser handle the filename
+  //       document.body.appendChild(link);
+  //       link.click();
+  //       document.body.removeChild(link);
+
+  //       // 3. Add a delay (1s) to prevent browsers from blocking multiple popups
+  //       await new Promise((resolve) => setTimeout(resolve, 1000));
+  //     }
+      
+  //   } catch (error) {
+  //     console.error("Batch download error:", error);
+  //     toast.error("Failed to start batch download.");
+  //   }
+  // };
+
+  const handleDownloadAll = async () => {
+    try {
+      toast.info("Starting batch processing... Please keep this window open.");
+      
+      // 1. Trigger the tasks on the backend
+      const response = await sessionsApi.downloadAllSnippets(sessionId);
+      
+      if (response.results.length === 0) {
+        toast.warning("No snippets found to download.");
+        return;
+      }
+
+      toast.success(`Processing ${response.results.length} snippets. Downloads will start automatically when ready.`);
+
+      // 2. Iterate through each task
+      for (const result of response.results) {
+        const { task_id, snippet_id, name } = result;
+        let isReady = false;
+        let attempts = 0;
+        const maxAttempts = 60; // Wait up to ~2 minutes (60 * 2s)
+
+        // --- POLLING LOOP ---
+        while (!isReady && attempts < maxAttempts) {
+          try {
+            // Check status (You need to add this method to your API or use fetch)
+            // If you haven't added it to snippetsApi yet, you can try: 
+            // const res = await fetch(`${import.meta.env.VITE_API_URL}/snippets/tasks/${task_id}`);
+            // const status = await res.json();
+            
+            const status = await snippetsApi.getTaskStatus(task_id); //
+
+            if (status.status === 'SUCCESS') {
+              isReady = true;
+            } else if (status.status === 'FAILURE' || status.status === 'REVOKED') {
+              toast.error(`Generation failed for snippet: ${name}`);
+              break; // Stop waiting for this one
+            } else {
+              // Still 'PENDING', 'STARTED', or 'RETRY'
+              await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s
+              attempts++;
+            }
+          } catch (e) {
+            console.error("Polling error", e);
+            // Optional: break or continue depending on error tolerance
+            break;
+          }
+        }
+
+        // 3. Download if Ready
+        if (isReady) {
+          const url = getSnippetDownloadUrl(snippet_id); //
+          
+          // Create hidden link to force download
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = ''; 
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          // Buffer to prevent browser blocking multiple downloads
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } else if (attempts >= maxAttempts) {
+           toast.error(`Timeout waiting for snippet: ${name}`);
+        }
+      }
+      
+      toast.success("Batch download complete.");
+
+    } catch (error) {
+      console.error("Batch download error:", error);
+      toast.error("Failed to start batch download.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -395,6 +508,14 @@ export default function SessionDetails() {
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download Snippet
+                  </Button>
+                  {/* --- NEW BUTTON HERE --- */}
+                  <Button
+                    className="w-full ai-gradient mt-2"
+                    onClick={handleDownloadAll}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Generate & Download All
                   </Button>
                 </div>
               )}

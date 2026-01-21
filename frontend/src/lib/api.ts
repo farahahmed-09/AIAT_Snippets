@@ -1,7 +1,7 @@
 // SmartCut AI API Client
 // Prefer env-configured backend to avoid hardcoding deployment URLs.
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
-//export const BACKEND_URL = "http://127.0.0.1:8000";
+//export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
+export const BACKEND_URL = "http://127.0.0.1:8000";
 const API_BASE_URL = BACKEND_URL ? `${BACKEND_URL}/api/v1` : "/api/v1";
 
 
@@ -26,7 +26,22 @@ const fetchWithTimeout = async (
     throw error;
   }
 };
+// ... existing interfaces ...
 
+export interface BatchDownloadResult {
+  snippet_id: number;
+  name: string;
+  task_id: string;
+  status: string;
+}
+
+export interface BatchDownloadResponse {
+  message: string;
+  session_id: number;
+  results: BatchDownloadResult[];
+}
+
+// ... existing interfaces ...
 export interface Session {
   id: number;
   name: string;
@@ -73,7 +88,11 @@ export interface UpdatePlanRequest {
   }[];
 }
 
-// Sessions API
+
+//------------------------------------------------------------------------------------------------
+//--------------------------------------------- Sessions API--------------------------------------
+//------------------------------------------------------------------------------------------------
+
 export const sessionsApi = {
   uploadSession: async (data: UploadSessionRequest): Promise<Session> => {
     const response = await fetchWithTimeout(`${API_BASE_URL}/upload-session`, {
@@ -84,6 +103,20 @@ export const sessionsApi = {
     if (!response.ok) throw new Error("Failed to upload session");
     return response.json();
   },
+
+
+  /**
+   * Triggers the batch generation for all snippets.
+   * Returns a list of tasks so the UI can download them individually.
+   */
+  downloadAllSnippets: async (sessionId: number): Promise<BatchDownloadResponse> => {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/sessions/${sessionId}/download-all`
+    );
+    if (!response.ok) throw new Error("Failed to start batch download");
+    return response.json();
+  },
+  
 
   listSessions: async (params?: {
     skip?: number;
@@ -139,7 +172,11 @@ export const sessionsApi = {
   },
 };
 
-// Snippets API
+//------------------------------------------------------------------------------------------------
+//--------------------------------------------- Snippets API--------------------------------------
+//------------------------------------------------------------------------------------------------
+
+
 export const snippetsApi = {
   processSnippet: async (
     snippetId: number
@@ -153,7 +190,22 @@ export const snippetsApi = {
     if (!response.ok) throw new Error("Failed to process snippet");
     return response.json();
   },
+
+  // --- ADD THIS SECTION ---
+  getTaskStatus: async (
+    taskId: string
+  ): Promise<{ task_id: string; status: string; result: any }> => {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/snippets/tasks/${taskId}`
+    );
+    if (!response.ok) throw new Error("Failed to get task status");
+    return response.json();
+  },
+  // ------------------------
 };
+
+
+
 
 export const getSnippetDownloadUrl = (snippetId: number): string =>
   `${API_BASE_URL}/snippets/${snippetId}/download`;
