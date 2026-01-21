@@ -1,5 +1,5 @@
 from celery.result import AsyncResult
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 import os
 
 from src.app.core.config import settings

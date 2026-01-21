@@ -230,7 +230,7 @@ export default function SessionDetails() {
       return;
     }
     if (!activeSnippet.storage_link) {
-      toast.error("Snippet is not ready yet. Generate the clip first.");
+      toast.error("Oops! The snippet isn’t ready yet. Please generate the clip first and give it a moment. If you’ve already clicked the generate button, just hang tight for a second!");
       return;
     }
     const downloadUrl = getSnippetDownloadUrl(activeSnippet.id);
