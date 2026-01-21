@@ -47,10 +47,14 @@ class SessionBase(BaseModel):
     # Rename these to match the frontend JSON keys exactly
     speaker_name: Optional[str] = None
     speaker_title: Optional[str] = None
-    speaker_image_url: Optional[str] = None    # Changed from speaker_image_base64
-    intro_video_url: Optional[str] = None      # Changed from intro_video_base64
-    background_image_url: Optional[str] = None # Changed from background_image_base64
+    # Changed from speaker_image_base64
+    speaker_image_url: Optional[str] = None
+    # Changed from intro_video_base64
+    intro_video_url: Optional[str] = None
+    # Changed from background_image_base64
+    background_image_url: Optional[str] = None
     # --- FIX ENDS HERE ---
+
 
 class SessionCreate(SessionBase):
     pass
@@ -86,3 +90,9 @@ class PlanUpdateItem(BaseModel):
 
 class PlanUpdate(BaseModel):
     snippets: List[PlanUpdateItem]
+
+
+class IntroUpload(BaseModel):
+    name: str
+    video_base64: str
+    thumbnail_base64: str

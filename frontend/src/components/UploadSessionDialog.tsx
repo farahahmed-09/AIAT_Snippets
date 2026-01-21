@@ -1,6 +1,14 @@
 import { useState, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Link as LinkIcon, Upload, User, FileVideo, Image as ImageIcon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Loader2,
+  Link as LinkIcon,
+  Upload,
+  User,
+  FileVideo,
+  Image as ImageIcon,
+  Check,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +16,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Ensure you have these components
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,18 +30,18 @@ interface UploadSessionDialogProps {
 }
 
 // Helper Component for "URL or File" input
-const InputWithUpload = ({ 
-  id, 
-  label, 
-  value, 
-  onChange, 
+const InputWithUpload = ({
+  id,
+  label,
+  value,
+  onChange,
   icon: Icon,
-  accept 
-}: { 
-  id: string; 
-  label: string; 
-  value: string; 
-  onChange: (val: string) => void; 
+  accept,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
   icon: any;
   accept: string;
 }) => {
@@ -41,6 +50,14 @@ const InputWithUpload = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Check file size (5MB limit for images)
+      const isImage = file.type.startsWith("image/");
+      const limit = isImage ? 5 : 50; // 5MB for images, 50MB for others
+      if (file.size > limit * 1024 * 1024) {
+        toast.error(`File too large. Max allowed: ${limit}MB`);
+        return;
+      }
+
       // Convert to Base64
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -68,19 +85,21 @@ const InputWithUpload = ({
             readOnly={isBase64} // Prevent editing text if it's a file
           />
         </div>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          accept={accept} 
-          onChange={handleFileChange} 
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          accept={accept}
+          onChange={handleFileChange}
         />
-        <Button 
-          type="button" 
-          variant="outline" 
+        <Button
+          type="button"
+          variant="outline"
           size="icon"
           title="Upload Local File"
-          onClick={() => isBase64 ? onChange("") : fileInputRef.current?.click()}
+          onClick={() =>
+            isBase64 ? onChange("") : fileInputRef.current?.click()
+          }
         >
           {isBase64 ? (
             <span className="text-red-500 font-bold">X</span>
@@ -89,15 +108,25 @@ const InputWithUpload = ({
           )}
         </Button>
       </div>
-      {isBase64 && <p className="text-xs text-green-600">Local file ready for upload.</p>}
+      {isBase64 && (
+        <p className="text-xs text-green-600">Local file ready for upload.</p>
+      )}
     </div>
   );
 };
 
-export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogProps) {
+export function UploadSessionDialog({
+  open,
+  onOpenChange,
+}: UploadSessionDialogProps) {
   const queryClient = useQueryClient();
+  const { data: introAssets, isLoading: isLoadingIntros } = useQuery({
+    queryKey: ["intro-assets"],
+    queryFn: () => sessionsApi.listIntroAssets(),
+  });
+
   const [activeTab, setActiveTab] = useState("basic");
-  
+
   // Basic Info
   const [name, setName] = useState("");
   const [module, setModule] = useState("");
@@ -118,7 +147,7 @@ export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogP
         drive_link: driveLink,
         speaker_name: speakerName || undefined,
         speaker_title: speakerTitle || undefined,
-        
+
         // FIX: Map your state variables to the "_url" keys expected by the backend
         speaker_image_url: speakerImage || undefined,
         intro_video_url: introVideo || undefined,
@@ -153,6 +182,11 @@ export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogP
       toast.error("Name and Drive Link are required");
       return;
     }
+    if (!introVideo) {
+      toast.error("Please select an intro video in the Branding tab");
+      setActiveTab("branding");
+      return;
+    }
     uploadMutation.mutate();
   };
 
@@ -167,7 +201,11 @@ export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogP
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="branding">Speaker & Branding</TabsTrigger>
@@ -243,15 +281,57 @@ export function UploadSessionDialog({ open, onOpenChange }: UploadSessionDialogP
                 accept="image/*"
               />
 
-              {/* Intro Video Input */}
-              <InputWithUpload
-                id="intro_video"
-                label="Intro Video (URL or Upload)"
-                value={introVideo}
-                onChange={setIntroVideo}
-                icon={FileVideo}
-                accept="video/*"
-              />
+              {/* Intro Video Selection Grid */}
+              <div className="space-y-2">
+                <Label>Select Intro Video *</Label>
+                {isLoadingIntros ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {introAssets && introAssets.length > 0 ? (
+                      introAssets.map((asset) => (
+                        <div
+                          key={asset.id}
+                          onClick={() => setIntroVideo(asset.video_url)}
+                          className={`relative rounded-lg overflow-hidden border-2 cursor-pointer transition-all hover:scale-[1.02] ${
+                            introVideo === asset.video_url
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-transparent bg-muted"
+                          }`}
+                        >
+                          <AspectRatio ratio={16 / 9}>
+                            <img
+                              src={asset.thumbnail_url}
+                              alt={asset.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src =
+                                  "https://placehold.co/600x400?text=No+Thumbnail";
+                              }}
+                            />
+                            {introVideo === asset.video_url && (
+                              <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                <div className="bg-primary text-white rounded-full p-1">
+                                  <Check className="w-4 h-4" />
+                                </div>
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1 text-[10px] text-white text-center truncate">
+                              {asset.name}
+                            </div>
+                          </AspectRatio>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-3 p-8 text-center border-2 border-dashed rounded-lg text-muted-foreground">
+                        No intro videos found in storage.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Background Image Input */}
               <InputWithUpload

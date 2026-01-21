@@ -3,27 +3,29 @@ import os
 import re
 import math
 import logging
-import time
 from typing import List, Optional, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from crewai import Agent, Task, Crew, Process
-from langchain_community.chat_models.litellm import ChatLiteLLM
 from src.app.core.config import settings
 from dotenv import load_dotenv
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
+
 # 1. Load Environment Variables
 load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-# Configure LLM
-api_key = settings.OPENAI_API_KEY
-if not api_key:
-    logger.warning("'OPENAI_API_KEY' not found in settings.")
 
-# Using gpt-4o exactly as in POC
-#llm = ChatLiteLLM(model="openai/gpt-4o", api_key=api_key)
-llm = ChatLiteLLM(model="gemini/gemini-2.5-pro", api_key=gemini_api_key)
+# Configure OpenAI client for LiteLLM proxy
+LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL")
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+LITELLM_MODEL = os.getenv("LITELLM_MODEL", "gemini/gemini-2.5-pro")
+
+if not LITELLM_API_KEY:
+    logger.warning("'LITELLM_API_KEY' not found in environment.")
+
+client = OpenAI(
+    api_key=LITELLM_API_KEY,
+    base_url=LITELLM_BASE_URL
+)
 
 
 class AgentService:
@@ -49,27 +51,30 @@ class AgentService:
 
     @staticmethod
     @retry(
-        stop=stop_after_attempt(10),  # more attempts
-        wait=wait_exponential(multiplier=2, min=10, max=120),  # longer wait
-        # LiteLLM errors are generic or specific depending on version
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=2, min=10, max=120),
         retry=retry_if_exception_type(Exception),
         before_sleep=lambda retry_state: logger.warning(
             f"LLM call failed (attempt {retry_state.attempt_number}), retrying in {retry_state.next_action.sleep}s...")
     )
-    def _call_llm_with_retry(prompt: str):
-        return llm.invoke(prompt)
+    def _call_llm_with_retry(messages: List[Dict[str, str]]):
+        response = client.chat.completions.create(
+            model=LITELLM_MODEL,
+            messages=messages,
+            temperature=0.2
+        )
+        return response.choices[0].message.content
 
     @staticmethod
-    def get_llm_response_content(prompt: str) -> Optional[str]:
+    def get_llm_response_content(prompt: str, system_prompt: Optional[str] = None) -> Optional[str]:
         try:
             logger.debug("Prompting LLM...")
-            response = AgentService._call_llm_with_retry(prompt)
-            if hasattr(response, 'content'):
-                return response.content
-            elif isinstance(response, str):
-                return response
-            else:
-                return str(response)
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            return AgentService._call_llm_with_retry(messages)
         except Exception as e:
             logger.error(
                 f"LLM Call Error after multiple retries: {e}", exc_info=True)
@@ -331,10 +336,10 @@ class AgentService:
         cls.save_json(cleansed, output_path)
         return True
 
-    # --- CrewAI Pipeline ---
+    # --- Agent Pipeline---
     @classmethod
-    def run_crewai_pipeline(cls, output_folder):
-        logger.info(f"Initiating CrewAI Pipeline in {output_folder}...")
+    def run_agent_pipeline(cls, output_folder):
+        logger.info(f"Initiating Agent Pipeline in {output_folder}...")
         input_segments_path = os.path.join(
             output_folder, "2b-merged_input_segments_cleared.json")
         merged_path = os.path.join(output_folder, "4-conceptual_merges.json")
@@ -343,118 +348,107 @@ class AgentService:
         input_data = cls.load_json(input_segments_path)
         if not input_data:
             logger.warning(
-                "Agent input data empty or missing. Skipping CrewAI execution.")
+                "Agent input data empty or missing. Skipping execution.")
             cls.save_json([], final_path)
             return True
 
-        analyzer_agent = Agent(
-            role='Instructional Designer and Script Strategist',
-            goal=(
-                'Extract singular, powerful learning modules from a long, unstructured lecture. '
-                'Create self-contained scripts that teach exactly one concept per video.'
-            ),
-            backstory=(
-                "You are an expert instructional designer who converts messy webinars into structured micro-learning courses. "
-                "You have a talent for identifying the 'start' and 'end' of a specific topic within a rambling speech. "
-                "Your goal is to find clusters of segments that explain a concept fully (Problem -> Explanation -> Solution) "
-                "so that a viewer can watch a 4-minute clip and learn something new without needing the rest of the video."
-            ),
-            llm=llm,
-            verbose=True,
-            allow_delegation=False
+        system_prompt = (
+            "You are an expert Instructional Designer and Script Strategist. "
+            "Your goal is to extract singular, powerful learning modules from a long, unstructured lecture. "
+            "Create self-contained scripts that teach exactly one concept per video. "
+            "You are an expert instructional designer who converts messy webinars into structured micro-learning courses. "
+            "You have a talent for identifying the 'start' and 'end' of a specific topic within a rambling speech. "
+            "Your goal is to find clusters of segments that explain a concept fully (Problem -> Explanation -> Solution) "
+            "so that a viewer can watch a 4-minute clip and learn something new without needing the rest of the video."
         )
 
         logger.info("Task 1: Conceptual Merging...")
-        task_merge = Task(
-            description=(
-                f"TASK 3: CONCEPTUAL MERGING (HIGH VOLUME REQUIRED).\n"
-                f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
-                f"Your goal is to identify and merge groups of **6 to 8 segments** to create standalone video scripts.\n\n"
-                f"### *** PRIMARY DIRECTIVE: QUANTITY IS CRITICAL ***\n"
-                f"You MUST generate **AT LEAST 8 to 10** merged video outputs. \n"
-                f"Do NOT stop after finding 3 or 4 good matches. You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
-                f"Failure to produce at least 8 outputs is a failed task.\n\n"
-                f"**CRITICAL MERGING RULES:**\n"
-                f"1. **STRICT SEGMENT LIMIT:** You are ONLY allowed to merge **6 to 8 segments per merged output**. "
-                f"It is strictly forbidden to merge fewer than 6 or more than 8 segments. "
-                f"This ensures the video length is 4–5 minutes.\n\n"
-                f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
-                f"To achieve the 8-10 video target, you must look for concepts everywhere. "
-                f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up to the 6-8 segment requirement.\n\n"
-                f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
-                f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
-                f"4. **NON-SEQUENTIAL MERGING IS ALLOWED:** You MAY merge segments even if they are **not adjacent** or sequential in numbering, "
-                f"as long as they belong to the **same conceptual topic**.\n\n"
-                f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications you should take the sgemnet as it is.\n\n"
-                f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
-                f"   Before finalizing your selection of 6-8 segments, you MUST perform this analysis:\n\n"
-                f"   **A. START BOUNDARY CHECK:**\n"
-                f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
-                f"   - Ask: Does my first segment depend on information, context, or references from that previous segment?\n"
-                f"   - Ask: Does my first segment start mid-explanation, mid-example, or mid-reasoning?\n"
-                f"   - If YES to either: You must INCLUDE that previous segment OR choose a different starting point.\n"
-                f"   - Your first segment must introduce something NEW, not continue something already started.\n\n"
-                f"   **B. END BOUNDARY CHECK:**\n"
-                f"   - Look at the segment IMMEDIATELY AFTER your chosen last segment.\n"
-                f"   - Ask: Does my last segment end with an incomplete thought that gets completed in the next segment?\n"
-                f"   - Ask: Does my last segment promise an explanation/example that appears in the next segment?\n"
-                f"   - If YES to either: You must INCLUDE that next segment OR choose a different ending point.\n"
-                f"   - Your last segment must CLOSE a thought, not leave it hanging.\n\n"
-                f"7. **SEQUENTIAL CONTEXT AWARENESS:**\n"
-                f"   - When you skip segments (non-sequential merging), you MUST verify that the skipped segments don't contain critical context for your selected segments.\n"
-                f"   - If segment 8 references 'this process' and you skipped segment 7 where 'this process' was explained, you cannot use segment 8.\n"
-                f"   - Always trace backwards: for each segment you select, check if it depends on ANY previous segment you didn't include.\n\n"
-                f"Input Filtered Segments:\n{json.dumps(input_data, indent=2)}\n\n"
-                f"Your output MUST be a valid JSON list. Each object must have:\n"
-                f"1. 'merged_text': The new smooth-flowing text, created by following the rules above.\n"
-                f"2. 'start': The 'start' time of the *first* segment used.\n"
-                f"3. 'end': The 'end' time of the *last* segment used.\n"
-                f"4. 'big_segments_used': A list of the 'id' strings of all segments used.\n"
-                f"5. 'vid_title': A short, descriptive title that you generate *based on the content* of the 'merged_text'.\n\n"
-                f"6. 'reasoning': i want here the thinking of the llm why he chose these segmnets to be merged together , for example if he choose segmnets [3 5 8 9] i want reason for each segment and i want reason why he decided to jump and dont take [4 6 7]"
-            ),
-            agent=analyzer_agent,
-            expected_output="A JSON string list of the conceptually merged segments. ONLY output the JSON list."
+        prompt_merge = (
+            f"TASK 3: CONCEPTUAL MERGING (HIGH VOLUME REQUIRED).\n"
+            f"Take this list of filtered segments. They are transcripts for a video, so consider them a sequential script for the whole conversation. "
+            f"Your goal is to identify and merge groups of **6 to 8 segments** to create standalone video scripts.\n\n"
+            f"### *** PRIMARY DIRECTIVE: QUANTITY IS CRITICAL ***\n"
+            f"You MUST generate **AT LEAST 8 to 10** merged video outputs. \n"
+            f"Do NOT stop after finding 3 or 4 good matches. You must exhaustively scan the ENTIRE list of segments to extract every possible valid concept. "
+            f"Failure to produce at least 8 outputs is a failed task.\n\n"
+            f"**CRITICAL MERGING RULES:**\n"
+            f"1. **STRICT SEGMENT LIMIT:** You are ONLY allowed to merge **6 to 8 segments per merged output**. "
+            f"It is strictly forbidden to merge fewer than 6 or more than 8 segments. "
+            f"This ensures the video length is 4–5 minutes.\n\n"
+            f"2. **EXHAUSTIVE SEARCH STRATEGY:** "
+            f"To achieve the 8-10 video target, you must look for concepts everywhere. "
+            f"If a topic seems 'thin', use Non-Sequential Merging to find related segments from later in the text to build it up to the 6-8 segment requirement.\n\n"
+            f"3. **PRESERVE SEGMENTS EXACTLY:** You MUST merge the *entire*, *exact* text content of each selected segment. "
+            f"It is **STRICTLY FORBIDDEN** to remove, summarize, or alter any text *within* a segment. You must take the whole segment as-is.\n\n"
+            f"4. **NON-SEQUENTIAL MERGING IS ALLOWED:** You MAY merge segments even if they are **not adjacent** or sequential in numbering, "
+            f"as long as they belong to the **same conceptual topic**.\n\n"
+            f"5. **NO CHANGES:** Do *not* add any new content, summaries, explanations, or modifications you should take the sgemnet as it is.\n\n"
+            f"6. **BOUNDARY ANALYSIS (CRITICAL - NO SKIPPING):**\n"
+            f"   Before finalizing your selection of 6-8 segments, you MUST perform this analysis:\n\n"
+            f"   **A. START BOUNDARY CHECK:**\n"
+            f"   - Look at the segment IMMEDIATELY BEFORE your chosen first segment.\n"
+            f"   - Ask: Does my first segment depend on information, context, or references from that previous segment?\n"
+            f"   - Ask: Does my first segment start mid-explanation, mid-example, or mid-reasoning?\n"
+            f"   - If YES to either: You must INCLUDE that previous segment OR choose a different starting point.\n"
+            f"   - Your first segment must introduce something NEW, not continue something already started.\n\n"
+            f"   **B. END BOUNDARY CHECK:**\n"
+            f"   - Look at the segment IMMEDIATELY AFTER your chosen last segment.\n"
+            f"   - Ask: Does my last segment end with an incomplete thought that gets completed in the next segment?\n"
+            f"   - Ask: Does my last segment promise an explanation/example that appears in the next segment?\n"
+            f"   - If YES to either: You must INCLUDE that next segment OR choose a different ending point.\n"
+            f"   - Your last segment must CLOSE a thought, not leave it hanging.\n\n"
+            f"7. **SEQUENTIAL CONTEXT AWARENESS:**\n"
+            f"   - When you skip segments (non-sequential merging), you MUST verify that the skipped segments don't contain critical context for your selected segments.\n"
+            f"   - If segment 8 references 'this process' and you skipped segment 7 where 'this process' was explained, you cannot use segment 8.\n"
+            f"   - Always trace backwards: for each segment you select, check if it depends on ANY previous segment you didn't include.\n\n"
+            f"Input Filtered Segments:\n{json.dumps(input_data, indent=2)}\n\n"
+            f"Your output MUST be a valid JSON list. Each object must have:\n"
+            f"1. 'merged_text': The new smooth-flowing text, created by following the rules above.\n"
+            f"2. 'start': The 'start' time of the *first* segment used.\n"
+            f"3. 'end': The 'end' time of the *last* segment used.\n"
+            f"4. 'big_segments_used': A list of the 'id' strings of all segments used.\n"
+            f"5. 'vid_title': A short, descriptive title that you generate *based on the content* of the 'merged_text'.\n\n"
+            f"6. 'reasoning': i want here the thinking of the llm why he chose these segmnets to be merged together , for example if he choose segmnets [3 5 8 9] i want reason for each segment and i want reason why he decided to jump and dont take [4 6 7]\n\n"
+            f"OUTPUT: Return ONLY a valid JSON list of objects."
         )
 
-        merged_data = cls.run_task_and_clean(
-            analyzer_agent, task_merge, merged_path)
+        merged_data = cls.run_llm_task(
+            system_prompt, prompt_merge, merged_path)
         if not merged_data:
             logger.error("Step 1 (Conceptual Merging) failed.")
             return False
 
         logger.info("Task 2: Final Processing...")
-        task_finalize = Task(
-            description=(
-                f"TASK: FINAL FILTERING.\n"
-                f"Take this list of conceptually merged segments. Perform a final quality check.\n"
-                f"Make sure each merged segment can form a 3-5 min video (approx 400-800 words).\n"
-                f"ONLY KEEP segments that are 'self-contained'. Discard segments that sound like intros or outros.\n\n"
-                f"Input Merged Segments:\n{json.dumps(merged_data, indent=2)}\n\n"
-                f"Your output MUST be a valid JSON list containing only the final segments."
-            ),
-            agent=analyzer_agent,
-            expected_output="A JSON string list of the final, self-contained segments. ONLY output the JSON list."
+        prompt_finalize = (
+            f"TASK: FINAL FILTERING.\n"
+            f"Take this list of conceptually merged segments. Perform a final quality check.\n"
+            f"Make sure each merged segment can form a 3-5 min video (approx 400-800 words).\n"
+            f"ONLY KEEP segments that are 'self-contained'. Discard segments that sound like intros or outros.\n\n"
+            f"Input Merged Segments:\n{json.dumps(merged_data, indent=2)}\n\n"
+            f"Your output MUST be a valid JSON list containing only the final segments.\n\n"
+            f"OUTPUT: Return ONLY a valid JSON list."
         )
-        cls.run_task_and_clean(analyzer_agent, task_finalize, final_path)
+        cls.run_llm_task(system_prompt, prompt_finalize, final_path)
 
-        logger.info("CrewAI processing successfully finished.")
+        logger.info("Agent processing successfully finished.")
         return True
 
     @classmethod
-    def run_task_and_clean(cls, agent, task, output_path):
-        logger.info(f"Kicking off task for {output_path}...")
-        crew = Crew(agents=[agent], tasks=[task],
-                    process=Process.sequential, verbose=False)
-        result = crew.kickoff()
-        raw = result.raw if hasattr(result, 'raw') else str(result)
+    def run_llm_task(cls, system_prompt, user_prompt, output_path):
+        logger.info(f"Kicking off LLM task for {output_path}...")
+        raw = cls.get_llm_response_content(
+            user_prompt, system_prompt=system_prompt)
+        if not raw:
+            return None
 
         try:
+            # Try to find JSON list
             json_match = re.search(r'\[.*\]', raw, re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group(0))
                 cls.save_json(data, output_path)
                 return data
+
             # Try to find JSON block code
             json_block = re.search(
                 r'```json\s*(\[.*?\])\s*```', raw, re.DOTALL)
@@ -464,7 +458,7 @@ class AgentService:
                 return data
         except Exception as e:
             logger.error(
-                f"Failed to parse CrewAI output for {output_path}: {str(e)}", exc_info=True)
+                f"Failed to parse LLM output for {output_path}: {str(e)}", exc_info=True)
         return None
 
     # --- Postprocessing ---

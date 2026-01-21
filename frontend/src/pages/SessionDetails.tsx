@@ -28,6 +28,14 @@ import { SegmentList } from "@/components/SegmentList";
 import { toPlayableVideoUrl } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+interface Segment {
+  id: number;
+  topic: string;
+  startTime: number;
+  endTime: number;
+  color: "blue" | "green" | "purple" | "orange" | "pink";
+}
+
 export default function SessionDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -39,6 +47,40 @@ export default function SessionDetails() {
   const [activeSegmentId, setActiveSegmentId] = useState<number | null>(null);
   const [localSegments, setLocalSegments] = useState<Segment[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+  // Poll for single snippet task status
+  const { data: taskStatus } = useQuery({
+    queryKey: ["task", activeTaskId],
+    queryFn: () => snippetsApi.getTaskStatus(activeTaskId!),
+    enabled: !!activeTaskId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (
+        status === "SUCCESS" ||
+        status === "FAILURE" ||
+        status === "REVOKED"
+      ) {
+        return false;
+      }
+      return 2000;
+    },
+  });
+
+  // Handle task completion
+  useEffect(() => {
+    if (taskStatus?.status === "SUCCESS") {
+      toast.success("Video generated successfully!");
+      setActiveTaskId(null);
+      queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+    } else if (
+      taskStatus?.status === "FAILURE" ||
+      taskStatus?.status === "REVOKED"
+    ) {
+      toast.error("Video generation failed.");
+      setActiveTaskId(null);
+    }
+  }, [taskStatus, queryClient, sessionId]);
 
   const {
     data: session,
@@ -101,13 +143,16 @@ export default function SessionDetails() {
 
   const processMutation = useMutation({
     mutationFn: (snippetId: number) => snippetsApi.processSnippet(snippetId),
-    onSuccess: () => toast.success("Snippet processing started"),
+    onSuccess: (data) => {
+      toast.info("Generation started...");
+      setActiveTaskId(data.task_id);
+    },
     onError: () => toast.error("Failed to start processing"),
   });
 
   const handleSegmentUpdate = (updatedSegment: Segment) => {
     setLocalSegments((prev) =>
-      prev.map((seg) => (seg.id === updatedSegment.id ? updatedSegment : seg))
+      prev.map((seg) => (seg.id === updatedSegment.id ? updatedSegment : seg)),
     );
     setHasChanges(true);
   };
@@ -120,7 +165,7 @@ export default function SessionDetails() {
   const handleAddSnippet = () => {
     const name = prompt(
       "Enter snippet name:",
-      `New Snippet ${localSegments.length + 1}`
+      `New Snippet ${localSegments.length + 1}`,
     );
     if (name === null) return; // Cancelled
 
@@ -219,7 +264,7 @@ export default function SessionDetails() {
     session.job_status === "Pending";
   const isFinished = session.job_status === "Finished";
   const activeSnippet: Snippet | undefined = session.snippets?.find(
-    (s) => s.id === activeSegmentId
+    (s) => s.id === activeSegmentId,
   );
   const rawVideoUrl = session.video_url || session.drive_link || "";
   const sessionVideoUrl = toPlayableVideoUrl(rawVideoUrl);
@@ -230,22 +275,22 @@ export default function SessionDetails() {
       return;
     }
     if (!activeSnippet.storage_link) {
-      toast.error("Oops! The snippet isn’t ready yet. Please generate the clip first and give it a moment. If you’ve already clicked the generate button, just hang tight for a second!");
+      toast.error(
+        "Oops! The snippet isn’t ready yet. Please generate the clip first and give it a moment. If you’ve already clicked the generate button, just hang tight for a second!",
+      );
       return;
     }
     const downloadUrl = getSnippetDownloadUrl(activeSnippet.id);
     window.open(downloadUrl, "_blank", "noopener");
   };
 
-
-
   // const handleDownloadAll = async () => {
   //   try {
   //     toast.info("Starting batch processing... Please allow multiple downloads if prompted.");
-      
+
   //     // 1. Call the backend to trigger tasks and get the list
   //     const response = await sessionsApi.downloadAllSnippets(sessionId);
-      
+
   //     if (response.results.length === 0) {
   //       toast.warning("No snippets found to download.");
   //       return;
@@ -256,7 +301,7 @@ export default function SessionDetails() {
   //     // 2. Loop through results and trigger individual downloads
   //     for (const result of response.results) {
   //       const url = getSnippetDownloadUrl(result.snippet_id);
-        
+
   //       // Create a temporary hidden link to force download
   //       const link = document.createElement('a');
   //       link.href = url;
@@ -268,7 +313,7 @@ export default function SessionDetails() {
   //       // 3. Add a delay (1s) to prevent browsers from blocking multiple popups
   //       await new Promise((resolve) => setTimeout(resolve, 1000));
   //     }
-      
+
   //   } catch (error) {
   //     console.error("Batch download error:", error);
   //     toast.error("Failed to start batch download.");
@@ -278,16 +323,18 @@ export default function SessionDetails() {
   const handleDownloadAll = async () => {
     try {
       toast.info("Starting batch processing... Please keep this window open.");
-      
+
       // 1. Trigger the tasks on the backend
       const response = await sessionsApi.downloadAllSnippets(sessionId);
-      
+
       if (response.results.length === 0) {
         toast.warning("No snippets found to download.");
         return;
       }
 
-      toast.success(`Processing ${response.results.length} snippets. Downloads will start automatically when ready.`);
+      toast.success(
+        `Processing ${response.results.length} snippets. Downloads will start automatically when ready.`,
+      );
 
       // 2. Iterate through each task
       for (const result of response.results) {
@@ -300,15 +347,18 @@ export default function SessionDetails() {
         while (!isReady && attempts < maxAttempts) {
           try {
             // Check status (You need to add this method to your API or use fetch)
-            // If you haven't added it to snippetsApi yet, you can try: 
+            // If you haven't added it to snippetsApi yet, you can try:
             // const res = await fetch(`${import.meta.env.VITE_API_URL}/snippets/tasks/${task_id}`);
             // const status = await res.json();
-            
+
             const status = await snippetsApi.getTaskStatus(task_id); //
 
-            if (status.status === 'SUCCESS') {
+            if (status.status === "SUCCESS") {
               isReady = true;
-            } else if (status.status === 'FAILURE' || status.status === 'REVOKED') {
+            } else if (
+              status.status === "FAILURE" ||
+              status.status === "REVOKED"
+            ) {
               toast.error(`Generation failed for snippet: ${name}`);
               break; // Stop waiting for this one
             } else {
@@ -326,11 +376,11 @@ export default function SessionDetails() {
         // 3. Download if Ready
         if (isReady) {
           const url = getSnippetDownloadUrl(snippet_id); //
-          
+
           // Create hidden link to force download
-          const link = document.createElement('a');
+          const link = document.createElement("a");
           link.href = url;
-          link.download = ''; 
+          link.download = "";
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -338,12 +388,11 @@ export default function SessionDetails() {
           // Buffer to prevent browser blocking multiple downloads
           await new Promise((resolve) => setTimeout(resolve, 1000));
         } else if (attempts >= maxAttempts) {
-           toast.error(`Timeout waiting for snippet: ${name}`);
+          toast.error(`Timeout waiting for snippet: ${name}`);
         }
       }
-      
-      toast.success("Batch download complete.");
 
+      toast.success("Batch download complete.");
     } catch (error) {
       console.error("Batch download error:", error);
       toast.error("Failed to start batch download.");
@@ -491,14 +540,21 @@ export default function SessionDetails() {
                     className="w-full"
                     variant="outline"
                     onClick={() => processMutation.mutate(activeSegmentId)}
-                    disabled={processMutation.isPending}
+                    disabled={processMutation.isPending || !!activeTaskId}
                   >
-                    {processMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {processMutation.isPending || activeTaskId ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {activeTaskId
+                          ? `Processing (${taskStatus?.status || "PENDING"})...`
+                          : "Starting..."}
+                      </>
                     ) : (
-                      <Scissors className="w-4 h-4 mr-2" />
+                      <>
+                        <Scissors className="w-4 h-4 mr-2" />
+                        Generate Video
+                      </>
                     )}
-                    Generate Video
                   </Button>
                   <Button
                     className="w-full"

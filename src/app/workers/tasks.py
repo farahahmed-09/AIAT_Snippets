@@ -100,10 +100,10 @@ def process_session_pipeline(self, session_id: int):
         if not success:
             raise Exception("Preprocessing failed")
 
-        logger.info(f"Running CrewAI pipeline for session {session_id}")
-        success = AgentService.run_crewai_pipeline(output_folder)
+        logger.info(f"Running Agent pipeline for session {session_id}")
+        success = AgentService.run_agent_pipeline(output_folder)
         if not success:
-            raise Exception("CrewAI failed")
+            raise Exception("Agent pipeline failed")
 
         logger.info(f"Running postprocessing for session {session_id}")
         success = AgentService.run_postprocessing(output_folder)
@@ -134,12 +134,14 @@ def process_session_pipeline(self, session_id: int):
             sync_update({"id": session_id}, {"job_status": "Finished"})
             logger.info(
                 f"Session {session_id} pipeline completed successfully.")
-            
+
             # NEW: Maintain storage cache after successful pipeline
             try:
                 storage_service = StorageManagementService()
-                cache_result = run_async(storage_service.maintain_source_video_cache(max_keep=3))
-                logger.info(f"Storage cache maintenance result: {cache_result}")
+                cache_result = run_async(
+                    storage_service.maintain_source_video_cache(max_keep=3))
+                logger.info(
+                    f"Storage cache maintenance result: {cache_result}")
             except Exception as e:
                 logger.warning(f"Storage cache maintenance failed: {e}")
         else:
@@ -184,18 +186,21 @@ def generate_snippet_video(self, snippet_id: int):
 
     try:
         storage_service = StorageManagementService()
-        
+
         # NEW: Restore source video if archived
         try:
-            session_output_video = os.path.join(settings.OUTPUT_DIR, str(session['id']), "session_video.mp4")
+            session_output_video = os.path.join(
+                settings.OUTPUT_DIR, str(session['id']), "session_video.mp4")
             if not os.path.exists(session_output_video) or os.path.getsize(session_output_video) < 1000000:
                 if not session.get('source_video_stored'):
-                    logger.info(f"Source video archived, restoring for snippet {snippet_id}...")
-                    await_path = run_async(storage_service.restore_deleted_session_video(session['id']))
+                    logger.info(
+                        f"Source video archived, restoring for snippet {snippet_id}...")
+                    await_path = run_async(
+                        storage_service.restore_deleted_session_video(session['id']))
                     logger.info(f"Source video restored at: {await_path}")
         except Exception as e:
             logger.warning(f"Failed to restore source video: {e}")
-        
+
         video_dir = os.path.join(settings.INPUT_DIR, str(session['id']))
         os.makedirs(video_dir, exist_ok=True)
 
@@ -240,8 +245,6 @@ def generate_snippet_video(self, snippet_id: int):
         success, msg = VideoService.process_video_with_ffmpeg(
             video_path, plan_path, output_dir, temp_dir, session['id'], supabase, snippet_id=snippet['id'])
 
-
-
         if success:
             # # Filename is generated as "1) {sanitized_title}.mp4" because we have only one output in plan
             # sanitized_title = VideoService.sanitize_filename(snippet['name'])
@@ -274,7 +277,8 @@ def cleanup_ephemeral_snippets_task():
     try:
         supabase = SupabaseService()
         storage_service = StorageManagementService(supabase)
-        result = run_async(storage_service.cleanup_ephemeral_snippets(max_age_hours=1))
+        result = run_async(
+            storage_service.cleanup_ephemeral_snippets(max_age_hours=1))
         logger.info(f"Ephemeral snippet cleanup completed: {result}")
         return result
     except Exception as e:
@@ -292,9 +296,11 @@ def trim_old_source_videos_task():
     try:
         supabase = SupabaseService()
         storage_service = StorageManagementService(supabase)
-        result = run_async(storage_service.maintain_source_video_cache(max_keep=3))
+        result = run_async(
+            storage_service.maintain_source_video_cache(max_keep=3))
         logger.info(f"Source video cache maintenance completed: {result}")
         return result
     except Exception as e:
-        logger.error(f"Source video cache maintenance failed: {e}", exc_info=True)
+        logger.error(
+            f"Source video cache maintenance failed: {e}", exc_info=True)
         return f"Failed: {e}"

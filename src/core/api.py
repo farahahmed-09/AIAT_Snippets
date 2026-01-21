@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 
 # --- IMPORTS FROM YOUR OTHER FILES ---
 from transcribe import download_video_file, generate_transcript_from_video
-from Agent_snippets_generation import run_preprocessing, run_crewai_pipeline, run_postprocessing, load_json
+from Agent_snippets_generation import run_preprocessing, run_agent_pipeline, run_postprocessing, load_json
 from trim_concat import process_video_with_ffmpeg
 from ui_attachement import run_ui_pipeline
 
@@ -163,11 +163,11 @@ async def run_processing_pipeline():
             raise HTTPException(
                 status_code=500, detail="Halting execution due to pre-processing error.")
 
-        # Step B: CrewAI Agents
-        print("Running CrewAI...")
-        if not run_crewai_pipeline(OUTPUT_FOLDER_PATH):
+        # Step B: Agent Pipeline
+        print("Running Agent Pipeline...")
+        if not run_agent_pipeline(OUTPUT_FOLDER_PATH):
             raise HTTPException(
-                status_code=500, detail="Halting execution due to CrewAI pipeline error.")
+                status_code=500, detail="Halting execution due to Agent pipeline error.")
 
         # Step C: Postprocessing
         print("Running Postprocessing...")

@@ -1,15 +1,14 @@
 // SmartCut AI API Client
 // Prefer env-configured backend to avoid hardcoding deployment URLs.
-//export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
-export const BACKEND_URL = "http://127.0.0.1:8000";
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
+// export const BACKEND_URL = "http://127.0.0.1:8000";
 const API_BASE_URL = BACKEND_URL ? `${BACKEND_URL}/api/v1` : "/api/v1";
-
 
 // Fetch with timeout helper
 const fetchWithTimeout = async (
   url: string,
   options?: RequestInit,
-  timeout = 5000
+  timeout = 30000,
 ): Promise<Response> => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
@@ -42,6 +41,19 @@ export interface BatchDownloadResponse {
 }
 
 // ... existing interfaces ...
+export interface IntroAsset {
+  id: string;
+  video_url: string;
+  thumbnail_url: string;
+  name: string;
+}
+
+export interface IntroUploadRequest {
+  name: string;
+  video_base64: string;
+  thumbnail_base64: string;
+}
+
 export interface Session {
   id: number;
   name: string;
@@ -74,9 +86,9 @@ export interface UploadSessionRequest {
   speaker_name?: string;
   speaker_title?: string;
   // FIX: Change these back to match the backend Pydantic model
-  speaker_image_url?: string; 
-  intro_video_url?: string;   
-  background_image_url?: string; 
+  speaker_image_url?: string;
+  intro_video_url?: string;
+  background_image_url?: string;
 }
 
 export interface UpdatePlanRequest {
@@ -88,35 +100,38 @@ export interface UpdatePlanRequest {
   }[];
 }
 
-
 //------------------------------------------------------------------------------------------------
 //--------------------------------------------- Sessions API--------------------------------------
 //------------------------------------------------------------------------------------------------
 
 export const sessionsApi = {
   uploadSession: async (data: UploadSessionRequest): Promise<Session> => {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/upload-session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/upload-session`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      },
+      300000,
+    );
     if (!response.ok) throw new Error("Failed to upload session");
     return response.json();
   },
-
 
   /**
    * Triggers the batch generation for all snippets.
    * Returns a list of tasks so the UI can download them individually.
    */
-  downloadAllSnippets: async (sessionId: number): Promise<BatchDownloadResponse> => {
+  downloadAllSnippets: async (
+    sessionId: number,
+  ): Promise<BatchDownloadResponse> => {
     const response = await fetchWithTimeout(
-      `${API_BASE_URL}/sessions/${sessionId}/download-all`
+      `${API_BASE_URL}/sessions/${sessionId}/download-all`,
     );
     if (!response.ok) throw new Error("Failed to start batch download");
     return response.json();
   },
-  
 
   listSessions: async (params?: {
     skip?: number;
@@ -131,7 +146,7 @@ export const sessionsApi = {
     if (params?.order) searchParams.set("order", params.order);
 
     const response = await fetchWithTimeout(
-      `${API_BASE_URL}/sessions?${searchParams}`
+      `${API_BASE_URL}/sessions?${searchParams}`,
     );
     if (!response.ok) throw new Error("Failed to fetch sessions");
     return response.json();
@@ -139,17 +154,17 @@ export const sessionsApi = {
 
   getJobStatus: async (sessionId: number): Promise<{ job_status: string }> => {
     const response = await fetchWithTimeout(
-      `${API_BASE_URL}/jobs/${sessionId}/status`
+      `${API_BASE_URL}/jobs/${sessionId}/status`,
     );
     if (!response.ok) throw new Error("Failed to get job status");
     return response.json();
   },
 
   getSessionResults: async (
-    sessionId: number
+    sessionId: number,
   ): Promise<SessionWithSnippets> => {
     const response = await fetchWithTimeout(
-      `${API_BASE_URL}/sessions/${sessionId}/results`
+      `${API_BASE_URL}/sessions/${sessionId}/results`,
     );
     if (!response.ok) throw new Error("Failed to get session results");
     return response.json();
@@ -157,7 +172,7 @@ export const sessionsApi = {
 
   updatePlan: async (
     sessionId: number,
-    data: UpdatePlanRequest
+    data: UpdatePlanRequest,
   ): Promise<SessionWithSnippets> => {
     const response = await fetchWithTimeout(
       `${API_BASE_URL}/sessions/${sessionId}/plan`,
@@ -165,9 +180,31 @@ export const sessionsApi = {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      }
+      },
     );
     if (!response.ok) throw new Error("Failed to update plan");
+    return response.json();
+  },
+
+  listIntroAssets: async (): Promise<IntroAsset[]> => {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/assets/intro-videos`,
+    );
+    if (!response.ok) throw new Error("Failed to fetch intro assets");
+    return response.json();
+  },
+
+  uploadIntroAsset: async (data: IntroUploadRequest): Promise<IntroAsset> => {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/assets/intro-videos/upload`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      },
+      300000,
+    );
+    if (!response.ok) throw new Error("Failed to upload intro asset");
     return response.json();
   },
 };
@@ -176,16 +213,15 @@ export const sessionsApi = {
 //--------------------------------------------- Snippets API--------------------------------------
 //------------------------------------------------------------------------------------------------
 
-
 export const snippetsApi = {
   processSnippet: async (
-    snippetId: number
+    snippetId: number,
   ): Promise<{ message: string; task_id: string }> => {
     const response = await fetchWithTimeout(
       `${API_BASE_URL}/snippets/${snippetId}/process`,
       {
         method: "POST",
-      }
+      },
     );
     if (!response.ok) throw new Error("Failed to process snippet");
     return response.json();
@@ -193,19 +229,16 @@ export const snippetsApi = {
 
   // --- ADD THIS SECTION ---
   getTaskStatus: async (
-    taskId: string
+    taskId: string,
   ): Promise<{ task_id: string; status: string; result: any }> => {
     const response = await fetchWithTimeout(
-      `${API_BASE_URL}/snippets/tasks/${taskId}`
+      `${API_BASE_URL}/snippets/tasks/${taskId}`,
     );
     if (!response.ok) throw new Error("Failed to get task status");
     return response.json();
   },
   // ------------------------
 };
-
-
-
 
 export const getSnippetDownloadUrl = (snippetId: number): string =>
   `${API_BASE_URL}/snippets/${snippetId}/download`;

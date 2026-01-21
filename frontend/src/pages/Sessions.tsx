@@ -7,12 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import { sessionsApi, getStatusColor, getStatusLabel } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { UploadSessionDialog } from "@/components/UploadSessionDialog";
+import { UploadIntroDialog } from "@/components/UploadIntroDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Sessions() {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [introUploadOpen, setIntroUploadOpen] = useState(false);
 
-  const { data: sessions, isLoading, refetch, isRefetching, isError } = useQuery({
+  const {
+    data: sessions,
+    isLoading,
+    refetch,
+    isRefetching,
+    isError,
+  } = useQuery({
     queryKey: ["sessions"],
     queryFn: () => sessionsApi.listSessions({ limit: 50, order: "desc" }),
     refetchInterval: 10000, // Poll every 10 seconds for status updates
@@ -38,7 +46,17 @@ export default function Sessions() {
               onClick={() => refetch()}
               disabled={isRefetching}
             >
-              <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`}
+              />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIntroUploadOpen(true)}
+              className="border-primary/20 hover:bg-primary/5"
+            >
+              <Video className="w-4 h-4 mr-2 text-primary" />
+              Manage Intros
             </Button>
             <Button onClick={() => setUploadOpen(true)} className="ai-gradient">
               <Plus className="w-4 h-4 mr-2" />
@@ -68,7 +86,8 @@ export default function Sessions() {
             </div>
             <h3 className="font-semibold mb-2">Cannot connect to API</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Make sure your backend server is running at the configured URL. Update the API_BASE_URL in src/lib/api.ts if needed.
+              Make sure your backend server is running at the configured URL.
+              Update the API_BASE_URL in src/lib/api.ts if needed.
             </p>
             <Button onClick={() => refetch()} variant="outline">
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -99,7 +118,9 @@ export default function Sessions() {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" />
-                          {formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(session.created_at), {
+                            addSuffix: true,
+                          })}
                         </span>
                       </div>
                     </div>
@@ -135,6 +156,10 @@ export default function Sessions() {
       </main>
 
       <UploadSessionDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      <UploadIntroDialog
+        open={introUploadOpen}
+        onOpenChange={setIntroUploadOpen}
+      />
     </div>
   );
 }
