@@ -11,7 +11,7 @@ import logging
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 from src.app.core.config import settings
-from src.services.supabase import SupabaseService 
+from src.services.supabase import SupabaseService
 
 
 # === ADD THIS BLOCK ===
@@ -22,10 +22,11 @@ if not hasattr(Image, 'ANTIALIAS'):
 logger = logging.getLogger(__name__)
 
 # Defaults for fonts - assuming they are in input dir or we have fallback
-FONT_GILROY_BOLD = r"D:\AIAT_Snippets\src\app\fonts\Gilroy-Bold.ttf"
-FONT_GILROY_REGULAR = r"D:\AIAT_Snippets\src\app\fonts\Gilroy-Regular.ttf"
+FONT_GILROY_BOLD = r"src/app/fonts/Gilroy-Bold.ttf"
+FONT_GILROY_REGULAR = r"src/app/fonts/Gilroy-Regular.ttf"
 
 supabase = SupabaseService()
+
 
 def run_async(coro):
     try:
@@ -34,6 +35,7 @@ def run_async(coro):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         return loop.run_until_complete(coro)
+
 
 class VideoService:
     @staticmethod
@@ -60,7 +62,7 @@ class VideoService:
         """Downloads a file from a URL to a local destination if it is a URL."""
         if not url or not url.startswith(('http:', 'https:')):
             return url  # Return as is if it's already a local path
-        
+
         logger.debug(f"Downloading resource {url} to {dest_path}")
         try:
             response = requests.get(url, stream=True)
@@ -72,7 +74,6 @@ class VideoService:
         except Exception as e:
             logger.error(f"Failed to download {url}: {e}")
             raise e
-
 
     # @classmethod
     # def process_video_with_ffmpeg(cls, video_path, json_path, output_dir, temp_dir, session_id, supabase):
@@ -232,10 +233,13 @@ class VideoService:
                 for j, timestamp_obj in enumerate(timestamps):
                     start = timestamp_obj.get('start')
                     end = timestamp_obj.get('end')
-                    if start is None or end is None: continue
-                    if end > video_duration: end = video_duration
+                    if start is None or end is None:
+                        continue
+                    if end > video_duration:
+                        end = video_duration
 
-                    temp_file_path = os.path.join(temp_dir, f"temp_{i}_{j}.mp4")
+                    temp_file_path = os.path.join(
+                        temp_dir, f"temp_{i}_{j}.mp4")
                     try:
                         (
                             ffmpeg
@@ -245,12 +249,15 @@ class VideoService:
                         )
                         temp_file_paths.append(os.path.abspath(temp_file_path))
                     except ffmpeg.Error as e:
-                        logger.error(f"Failed to extract segment {j}: {e.stderr.decode()}")
+                        logger.error(
+                            f"Failed to extract segment {j}: {e.stderr.decode()}")
 
-                if not temp_file_paths: continue
+                if not temp_file_paths:
+                    continue
 
                 # Concatenate segments
-                concat_list_path = os.path.join(temp_dir, f"concat_list_{i}.txt")
+                concat_list_path = os.path.join(
+                    temp_dir, f"concat_list_{i}.txt")
                 try:
                     with open(concat_list_path, 'w', encoding='utf-8') as f:
                         for path in temp_file_paths:
@@ -270,7 +277,8 @@ class VideoService:
                 cls.clean_temp_folder(temp_dir)
 
                 # --- BRANDING & DB UPDATE ---
-                session_data = run_async(supabase.get(table="session", filters={"id": session_id}))
+                session_data = run_async(supabase.get(
+                    table="session", filters={"id": session_id}))
                 if session_data:
                     branding_data = {
                         "name": session_data.get("speaker_name"),
@@ -283,14 +291,16 @@ class VideoService:
                     }
 
                     # 1. Apply Branding
-                    branded_video_path = cls.run_ui_pipeline(output_path, branding_data, temp_dir)
-                    
+                    branded_video_path = cls.run_ui_pipeline(
+                        output_path, branding_data, temp_dir)
+
                     # 2. Upload to Storage and Update Database
                     # Ensure we match the name used in tasks.py (vid_title or 'Untitled')
                     snippet_name = vid_title if vid_title else 'Untitled'
-                    
-                    logger.info(f"Uploading and saving snippet: {snippet_name}")
-                    
+
+                    logger.info(
+                        f"Uploading and saving snippet: {snippet_name}")
+
                     try:
                         # Upload to Supabase Storage to get a public URL
                         # We organize storage by session_id (table_id) and type
@@ -302,23 +312,27 @@ class VideoService:
 
                         # Update the SPECIFIC snippet record
                         run_async(supabase.update(
-                            table="snippet", 
+                            table="snippet",
                             filters={
                                 "session_id": session_id,
                                 "name": snippet_name  # Match by name to update the correct row
-                            }, 
+                            },
                             updates={"storage_link": public_url}
                         ))
-                        logger.info(f"✅ Database updated for snippet '{snippet_name}' with URL: {public_url}")
-                        
+                        logger.info(
+                            f"✅ Database updated for snippet '{snippet_name}' with URL: {public_url}")
+
                     except Exception as db_err:
-                        logger.error(f"❌ Failed to upload/update database for {snippet_name}: {db_err}")
+                        logger.error(
+                            f"❌ Failed to upload/update database for {snippet_name}: {db_err}")
                 # ----------------------------
 
-            logger.info(f"FFmpeg processing complete. Total videos produced: {processed_count}")
+            logger.info(
+                f"FFmpeg processing complete. Total videos produced: {processed_count}")
             return True, f"Processed {processed_count} videos."
         except Exception as e:
-            logger.error(f"Critical error in FFmpeg processing: {str(e)}", exc_info=True)
+            logger.error(
+                f"Critical error in FFmpeg processing: {str(e)}", exc_info=True)
             return False, f"Error: {e}"
 
     # --- UI Processing ---
@@ -334,26 +348,28 @@ class VideoService:
 
         intro_output_dir = os.path.join(base_output_dir, "intro_templates")
         stitched_output_dir = os.path.join(base_output_dir, "stitched_vids")
-        final_output_dir = os.path.join(base_output_dir, "final_branded_videos")
+        final_output_dir = os.path.join(
+            base_output_dir, "final_branded_videos")
         temp_dir = os.path.join(base_output_dir, "temp_ui_processing")
         os.makedirs(temp_dir, exist_ok=True)
 
         logger.info("Step 1/3: Generating Intros...")
-        cls.generate_intros(processed_video_path, intro_output_dir, branding_data, temp_dir)
+        cls.generate_intros(processed_video_path,
+                            intro_output_dir, branding_data, temp_dir)
 
         logger.info("Step 2/3: Stitching Backgrounds...")
-        cls.stitch_backgrounds(processed_video_path, stitched_output_dir, branding_data, temp_dir)
+        cls.stitch_backgrounds(processed_video_path,
+                               stitched_output_dir, branding_data, temp_dir)
 
         logger.info("Step 3/3: Final Concatenation...")
-        cls.concat_final_videos(intro_output_dir, stitched_output_dir, final_output_dir, temp_dir)
+        cls.concat_final_videos(
+            intro_output_dir, stitched_output_dir, final_output_dir, temp_dir)
 
         logger.debug("Cleaning up UI pipeline temporary files...")
         shutil.rmtree(temp_dir, ignore_errors=True)
 
         final_video_path = os.path.join(final_output_dir, "final_video.mp4")
         return final_video_path
-
-
 
     @staticmethod
     def make_text_image(text, font_size, text_color, output_path, custom_font_path=None):
@@ -378,7 +394,7 @@ class VideoService:
     # @classmethod
     # def generate_intros(cls, processed_video_path, output_dir, branding_data, temp_dir):
     #     os.makedirs(output_dir, exist_ok=True)
-        
+
     #     # Extract branding data (speaker name, title, profile image, intro video)
     #     name = branding_data.get("name", "User")
     #     title = branding_data.get("title", "Title")
@@ -394,7 +410,7 @@ class VideoService:
     #         # --- DOWNLOAD RESOURCES ---
     #         profile_path = os.path.join(temp_dir, "downloaded_profile.png")
     #         intro_video_path = os.path.join(temp_dir, "downloaded_intro.mp4")
-            
+
     #         cls.download_resource(profile_url, profile_path)
     #         cls.download_resource(intro_video_url, intro_video_path)
     #         # --------------------------
@@ -428,17 +444,16 @@ class VideoService:
     #         intro_clip.close()
     #         final_intro.close()
 
-
     #         # ==================== ADD THIS BLOCK ====================
     #         try:
     #             # This saves a copy to D:\AIAT_Snippets\src\data\input (via settings.INPUT_DIR)
     #             # We append the sanitized video name to avoid overwriting if you process multiple files
     #             vid_name = os.path.splitext(os.path.basename(processed_video_path))[0]
     #             copy_filename = f"intro_{vid_name}.mp4"
-                
+
     #             # If you prefer just one static file named "intro_video.mp4", use this line instead:
     #             # copy_filename = "intro_video.mp4"
-                
+
     #             destination_path = os.path.join(settings.INPUT_DIR, copy_filename)
     #             shutil.copy2(output_path, destination_path)
     #             logger.info(f"Saved copy of intro to: {destination_path}")
@@ -452,11 +467,10 @@ class VideoService:
     #         logger.error(f"Error generating intro for {processed_video_path}: {e}")
     #         return False
 
-
     @classmethod
     def generate_intros(cls, processed_video_path, output_dir, branding_data, temp_dir):
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Extract branding data
         name = branding_data.get("name", "User")
         title = branding_data.get("title", "Title")
@@ -465,14 +479,15 @@ class VideoService:
         intro_video_url = files.get("intro_video")
 
         if not profile_url or not intro_video_url:
-            logger.error("Profile picture or intro video missing in branding data.")
+            logger.error(
+                "Profile picture or intro video missing in branding data.")
             return False
 
         try:
             # --- DOWNLOAD RESOURCES ---
             profile_path = os.path.join(temp_dir, "downloaded_profile.png")
             intro_video_path = os.path.join(temp_dir, "downloaded_intro.mp4")
-            
+
             cls.download_resource(profile_url, profile_path)
             cls.download_resource(intro_video_url, intro_video_path)
             # --------------------------
@@ -481,10 +496,11 @@ class VideoService:
             # Extract raw filename without extension for the "Video Title"
             raw_filename = os.path.basename(processed_video_path)
             raw_name_base = os.path.splitext(raw_filename)[0]
-            
+
             # Clean up the text: replace underscores/dashes with spaces, Title Case
-            video_name_text = raw_name_base.replace("_", " ").replace("-", " ").title()
-            
+            video_name_text = raw_name_base.replace(
+                "_", " ").replace("-", " ").title()
+
             # Wrap text if it exceeds 50 characters (matches ui_attachement logic)
             video_name_text = textwrap.fill(video_name_text, width=50)
 
@@ -495,13 +511,16 @@ class VideoService:
 
             # Generate Text Images using specific Styles and Fonts
             # 1. Video Title: Size 40, White, Gilroy-Bold
-            cls.make_text_image(video_name_text, 40, 'white', temp_vname_path, FONT_GILROY_BOLD)
-            
+            cls.make_text_image(video_name_text, 40, 'white',
+                                temp_vname_path, FONT_GILROY_BOLD)
+
             # 2. Name: Size 35, Yellow, Gilroy-Regular
-            cls.make_text_image(name, 35, 'yellow', temp_name_path, FONT_GILROY_REGULAR)
-            
+            cls.make_text_image(name, 35, 'yellow',
+                                temp_name_path, FONT_GILROY_REGULAR)
+
             # 3. Title/Role: Size 35, Yellow, Gilroy-Regular
-            cls.make_text_image(title, 35, 'yellow', temp_title_path, FONT_GILROY_REGULAR)
+            cls.make_text_image(title, 35, 'yellow',
+                                temp_title_path, FONT_GILROY_REGULAR)
             # -----------------------------------------------------------
 
             # Load the intro video
@@ -519,10 +538,14 @@ class VideoService:
                 output_img.save(temp_profile_path)
 
             # Create Clips
-            profile_clip = ImageClip(temp_profile_path).set_duration(intro_clip.duration).resize(height=intro_clip.h * 0.5)
-            vname_clip = ImageClip(temp_vname_path).set_duration(intro_clip.duration)
-            name_clip = ImageClip(temp_name_path).set_duration(intro_clip.duration)
-            title_clip = ImageClip(temp_title_path).set_duration(intro_clip.duration)
+            profile_clip = ImageClip(temp_profile_path).set_duration(
+                intro_clip.duration).resize(height=intro_clip.h * 0.5)
+            vname_clip = ImageClip(temp_vname_path).set_duration(
+                intro_clip.duration)
+            name_clip = ImageClip(temp_name_path).set_duration(
+                intro_clip.duration)
+            title_clip = ImageClip(temp_title_path).set_duration(
+                intro_clip.duration)
 
             # --- POSITIONING (Matches ui_attachement.py coordinates) ---
             margin_h = 150
@@ -530,31 +553,32 @@ class VideoService:
             # Profile: Right side, vertically centered
             p_x = intro_clip.w - profile_clip.w - margin_h
             p_y = (intro_clip.h - profile_clip.h) / 2
-            
+
             # Text Block: Left side starting at Y=650
             # 1. Video Name (Top)
             vn_x = margin_h
             vn_y = 650
-            
+
             # 2. Speaker Name (Below Video Name)
             n_x = margin_h
             n_y = vn_y + vname_clip.h + 10
-            
+
             # 3. Speaker Title (Below Speaker Name)
             t_x = margin_h
             t_y = n_y + name_clip.h + 10
 
             final_intro = CompositeVideoClip([
-                intro_clip, 
-                profile_clip.set_position((p_x, p_y)), 
-                vname_clip.set_position((vn_x, vn_y)), 
-                name_clip.set_position((n_x, n_y)), 
+                intro_clip,
+                profile_clip.set_position((p_x, p_y)),
+                vname_clip.set_position((vn_x, vn_y)),
+                name_clip.set_position((n_x, n_y)),
                 title_clip.set_position((t_x, t_y))
             ])
 
             output_path = os.path.join(output_dir, "intro_video.mp4")
-            final_intro.write_videofile(output_path, codec="libx264", audio_codec="aac", fps=30, verbose=False, logger=None)
-            
+            final_intro.write_videofile(
+                output_path, codec="libx264", audio_codec="aac", fps=30, verbose=False, logger=None)
+
             # Close clips to release resources
             intro_clip.close()
             final_intro.close()
@@ -565,9 +589,11 @@ class VideoService:
 
             # --- OPTIONAL: SAVE COPY TO INPUT DIR ---
             try:
-                vid_name = os.path.splitext(os.path.basename(processed_video_path))[0]
+                vid_name = os.path.splitext(
+                    os.path.basename(processed_video_path))[0]
                 copy_filename = f"intro_{vid_name}.mp4"
-                destination_path = os.path.join(settings.INPUT_DIR, copy_filename)
+                destination_path = os.path.join(
+                    settings.INPUT_DIR, copy_filename)
                 shutil.copy2(output_path, destination_path)
                 logger.info(f"Saved copy of intro to: {destination_path}")
             except Exception as e:
@@ -577,14 +603,14 @@ class VideoService:
             return output_path
 
         except Exception as e:
-            logger.error(f"Error generating intro for {processed_video_path}: {e}")
+            logger.error(
+                f"Error generating intro for {processed_video_path}: {e}")
             return False
-
 
     # @classmethod
     # def stitch_backgrounds(cls, processed_video_path, output_dir, branding_data, temp_dir):
     #     os.makedirs(output_dir, exist_ok=True)
-        
+
     #     # Extract branding data (background image)
     #     bg_url = branding_data.get("files", {}).get("background_picture")
     #     if not bg_url:
@@ -607,7 +633,7 @@ class VideoService:
     #     # ------------------------------------
 
     #     temp_bg = os.path.join(temp_dir, "resized_bg.png")
-        
+
     #     try:
     #         # Use local_bg_path (the downloaded file), NOT the URL
     #         with Image.open(local_bg_path) as img:
@@ -639,11 +665,10 @@ class VideoService:
     #         logger.error(f"Error stitching background for {processed_video_path}: {e}")
     #         return False
 
-
     @classmethod
     def stitch_backgrounds(cls, processed_video_path, output_dir, branding_data, temp_dir):
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Extract branding data (background image)
         bg_url = branding_data.get("files", {}).get("background_picture")
         if not bg_url:
@@ -659,7 +684,7 @@ class VideoService:
             else:
                 # If it's already local, just copy it to temp
                 if os.path.exists(bg_url):
-                     shutil.copy2(bg_url, local_bg_path)
+                    shutil.copy2(bg_url, local_bg_path)
                 else:
                     logger.error(f"Local background file not found: {bg_url}")
                     return False
@@ -673,7 +698,8 @@ class VideoService:
         try:
             with Image.open(local_bg_path) as img:
                 # Use LANCZOS for high-quality downsampling
-                img_resized = img.resize((1920, 1080), Image.Resampling.LANCZOS)
+                img_resized = img.resize(
+                    (1920, 1080), Image.Resampling.LANCZOS)
                 img_resized.save(temp_bg)
         except Exception as e:
             logger.error(f"Error resizing background: {e}")
@@ -690,9 +716,10 @@ class VideoService:
             # Centering the video on the background
             cmd = [
                 'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
-                '-loop', '1', '-i', temp_bg,           # Input 0: Background (looped)
+                # Input 0: Background (looped)
+                '-loop', '1', '-i', temp_bg,
                 '-i', processed_video_path,            # Input 1: Source Video
-                '-filter_complex', 
+                '-filter_complex',
                 # [1:v] source video -> reset timestamps -> scale to 1650px wide -> force 30fps -> [vid]
                 '[1:v]setpts=PTS-STARTPTS,scale=1650:-1,fps=30[vid];'
                 # [0:v] background -> overlay [vid] at center -> stop when shortest input ends -> [vout]
@@ -710,23 +737,29 @@ class VideoService:
             try:
                 # This saves a copy to D:\AIAT_Snippets\src\data\input (via settings.INPUT_DIR)
                 # We append the sanitized video name to avoid overwriting if you process multiple files
-                vid_name = os.path.splitext(os.path.basename(processed_video_path))[0]
+                vid_name = os.path.splitext(
+                    os.path.basename(processed_video_path))[0]
                 copy_filename = f"stitched_{vid_name}.mp4"
-                
-                destination_path = os.path.join(settings.INPUT_DIR, copy_filename)
+
+                destination_path = os.path.join(
+                    settings.INPUT_DIR, copy_filename)
                 shutil.copy2(target_video_path, destination_path)
-                logger.info(f"Saved copy of stitched video to: {destination_path}")
+                logger.info(
+                    f"Saved copy of stitched video to: {destination_path}")
             except Exception as e:
-                logger.error(f"Failed to copy stitched video to input directory: {e}")
+                logger.error(
+                    f"Failed to copy stitched video to input directory: {e}")
             # ==========================================================
 
             return target_video_path
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"FFmpeg error stitching background for {processed_video_path}: {e}")
+            logger.error(
+                f"FFmpeg error stitching background for {processed_video_path}: {e}")
             return False
         except Exception as e:
-            logger.error(f"Error stitching background for {processed_video_path}: {e}")
+            logger.error(
+                f"Error stitching background for {processed_video_path}: {e}")
             return False
 
     @classmethod
@@ -737,8 +770,10 @@ class VideoService:
         """
         try:
             probe = ffmpeg.probe(path)
-            video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
-            audio_stream = next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
+            video_stream = next(
+                (s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+            audio_stream = next(
+                (s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
 
             if not video_stream:
                 return None
@@ -749,8 +784,10 @@ class VideoService:
             fps = num / den if den > 0 else 0
 
             # Audio details defaults
-            audio_rate = int(audio_stream['sample_rate']) if audio_stream else 44100
-            audio_channels = int(audio_stream['channels']) if audio_stream else 2
+            audio_rate = int(
+                audio_stream['sample_rate']) if audio_stream else 44100
+            audio_channels = int(
+                audio_stream['channels']) if audio_stream else 2
             audio_codec = audio_stream['codec_name'] if audio_stream else 'aac'
 
             return {
@@ -772,12 +809,13 @@ class VideoService:
         os.makedirs(output_dir, exist_ok=True)
 
         intro_video_path = os.path.join(intro_output_dir, "intro_video.mp4")
-        stitched_video_path = os.path.join(stitched_output_dir, "stitched_video.mp4")
+        stitched_video_path = os.path.join(
+            stitched_output_dir, "stitched_video.mp4")
 
         if not os.path.exists(stitched_video_path):
             logger.error("Stitched background video not found.")
             return False
-        
+
         if not os.path.exists(intro_video_path):
             logger.error("Intro video not found.")
             return False
@@ -793,10 +831,12 @@ class VideoService:
             v2 = cls.get_stream_info(stitched_video_path)   # Stitched (Master)
 
             if not v1 or not v2:
-                logger.error("Metadata extraction failed. Cannot safely concatenate.")
+                logger.error(
+                    "Metadata extraction failed. Cannot safely concatenate.")
                 return False
 
-            logger.debug(f"Intro: {v1['width']}x{v1['height']} {v1['fps']:.2f}fps | Main: {v2['width']}x{v2['height']} {v2['fps']:.2f}fps")
+            logger.debug(
+                f"Intro: {v1['width']}x{v1['height']} {v1['fps']:.2f}fps | Main: {v2['width']}x{v2['height']} {v2['fps']:.2f}fps")
 
             # --- 2. CHECK MATCH & NORMALIZE ---
             properties_match = (
@@ -811,10 +851,12 @@ class VideoService:
             video1_ready_path = intro_video_path
 
             if not properties_match:
-                logger.info("⚠️ Format mismatch detected. Normalizing Intro to match Main video...")
-                
+                logger.info(
+                    "⚠️ Format mismatch detected. Normalizing Intro to match Main video...")
+
                 # Map codec names to FFmpeg encoder names (simple map)
-                codec_map = {'h264': 'libx264', 'hevc': 'libx265', 'vp9': 'libvpx-vp9'}
+                codec_map = {'h264': 'libx264',
+                             'hevc': 'libx265', 'vp9': 'libvpx-vp9'}
                 target_encoder = codec_map.get(v2['codec'], 'libx264')
 
                 # Re-encode Intro to match Stitched exactly
@@ -845,28 +887,32 @@ class VideoService:
             subprocess.run([
                 'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
                 '-f', 'concat', '-safe', '0', '-i', list_file,
-                '-c:v', 'copy', '-c:a', 'aac', 
+                '-c:v', 'copy', '-c:a', 'aac',
                 final_video_path
             ], check=True)
-            
-            logger.info(f"Successfully created final video: {final_video_path}")
+
+            logger.info(
+                f"Successfully created final video: {final_video_path}")
 
             # ==================== ADDED: SAVE COPY ====================
             try:
-                # We attempt to find a unique name based on the stitched video if possible, 
+                # We attempt to find a unique name based on the stitched video if possible,
                 # otherwise default to "final_video_copy.mp4"
                 # (Since this method doesn't take the original filename as input, we derive or use generic)
-                
+
                 # Attempt to get ID from stitched filename if it follows pattern, else timestamp
                 import time
                 timestamp = int(time.time())
                 copy_filename = f"final_video_{timestamp}.mp4"
-                
-                destination_path = os.path.join(settings.INPUT_DIR, copy_filename)
+
+                destination_path = os.path.join(
+                    settings.INPUT_DIR, copy_filename)
                 shutil.copy2(final_video_path, destination_path)
-                logger.info(f"Saved copy of final video to: {destination_path}")
+                logger.info(
+                    f"Saved copy of final video to: {destination_path}")
             except Exception as e:
-                logger.error(f"Failed to copy final video to input directory: {e}")
+                logger.error(
+                    f"Failed to copy final video to input directory: {e}")
             # ==========================================================
 
             return final_video_path

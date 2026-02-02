@@ -88,7 +88,17 @@ function ensure_redis() {
         print_success "Redis container created and started"
     fi
 
-    # Re-check
+    # Give Redis a few seconds to initialize
+    print_info "Waiting for Redis to initialize..."
+    for i in {1..5}; do
+        if check_redis >/dev/null 2>&1; then
+            print_success "Redis is ready"
+            return 0
+        fi
+        sleep 1
+    done
+
+    # Re-check one last time with full output if it failed
     if check_redis; then
         return 0
     else
