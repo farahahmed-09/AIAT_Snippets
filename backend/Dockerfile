@@ -14,6 +14,11 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY ai_core ./ai_core
+# Fail fast with an actionable message when the operator cloned without
+# `--recurse-submodules` (ai_core/ is an empty placeholder in that case).
+RUN test -f ai_core/pyproject.toml || ( \
+    echo "ERROR: backend/ai_core/ is empty — run 'git submodule update --init --recursive' before docker build" \
+    && exit 1)
 RUN pip install --upgrade pip && pip install ./ai_core && pip install .
 
 COPY app ./app

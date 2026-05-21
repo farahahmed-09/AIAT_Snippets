@@ -51,6 +51,36 @@ export function processSession(
   return apiFetch(`/sessions/${sessionId}/process`, { method: "POST" });
 }
 
+export function retrySession(
+  sessionId: number,
+): Promise<{ task_id: string; status: string }> {
+  return apiFetch(`/sessions/${sessionId}/retry`, { method: "POST" });
+}
+
+export function renderAllSnippets(
+  sessionId: number,
+): Promise<{
+  session_id: number;
+  tasks: { snippet_id: number; task_id: string }[];
+}> {
+  return apiFetch(`/sessions/${sessionId}/snippets/render-all`, {
+    method: "POST",
+  });
+}
+
+export type TaskStatusResponse = {
+  task_id: string;
+  status: string;
+  ready: boolean;
+  info?: { message?: string; progress?: number };
+  result?: unknown;
+  error?: string;
+};
+
+export function getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+  return apiFetch<TaskStatusResponse>(`/snippet-tasks/${taskId}`);
+}
+
 export function formatSeconds(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUserDep
 from app.schemas.snippet import Snippet, SnippetCreate, SnippetUpdate
@@ -7,7 +7,10 @@ from app.services import snippets
 from app.workers.celery_app import celery_app
 from app.workers.tasks import render_snippet as render_snippet_task
 
-# Single-snippet routes mounted at /snippets/{snippet_id}.
+# Single-snippet routes mounted at /snippets/{snippet_id}. The task-
+# status endpoint lives on its OWN router (see `tasks_router` at the
+# bottom) so a request for /snippets/tasks/<uuid> never gets matched
+# by the `{snippet_id}: int` route first.
 router = APIRouter()
 
 
@@ -25,24 +28,35 @@ def update_snippet(
 
 @router.delete("/{snippet_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_snippet(snippet_id: int, user: CurrentUserDep) -> None:
+    row = snippets._load_with_access(user.id, snippet_id, write=True)
+    if row.get("is_persisted") is False and row.get("storage_link"):
+        # Render in-flight: storage link cleared but row still marked
+        # non-persisted by the worker — refuse to delete the row out
+        # from under it.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Snippet is currently rendering; wait for it to finish or fail.",
+        )
     snippets.delete(user.id, snippet_id)
 
 
 @router.post("/{snippet_id}/render")
 def trigger_render(snippet_id: int, user: CurrentUserDep) -> dict[str, str]:
-    # Authorisation: writer access on the snippet's session.
     snippets._load_with_access(user.id, snippet_id, write=True)
     task = render_snippet_task.delay(snippet_id)
     return {"task_id": task.id, "status": "queued"}
 
 
-@router.get("/tasks/{task_id}")
+# Task-status routes mounted at /snippet-tasks/{task_id} (a separate
+# prefix to dodge route shadowing by /snippets/{snippet_id:int}).
+tasks_router = APIRouter()
+
+
+@tasks_router.get("/{task_id}")
 def get_task_status(task_id: str, user: CurrentUserDep) -> dict[str, object]:
     """Polling endpoint for the Celery task id returned by `/render`
-    and `/process`. Mirrors the old `GET /snippets/tasks/{task_id}`.
-    `user` is captured purely to keep the endpoint authenticated; task
-    ids are opaque so we don't try to gate by ownership here.
-    """
+    and `/process`. Task ids are opaque so we don't gate by ownership
+    here; the dependency keeps the endpoint authenticated."""
     _ = user
     result = celery_app.AsyncResult(task_id)
     info = result.info if isinstance(result.info, dict) else None
@@ -87,11 +101,7 @@ def create_snippet(
 def render_all(
     session_id: int, user: CurrentUserDep
 ) -> dict[str, object]:
-    """Fan out a render task per snippet in this session.
-
-    Mirrors the old `GET /sessions/{id}/download-all`. Returns the list
-    of dispatched task ids so the UI can poll each one.
-    """
+    """Fan out a render task per snippet in this session."""
     sessions_service._fetch_session_with_access(user.id, session_id, write=True)
     items = snippets.list_for_session(user.id, session_id)
     results = [

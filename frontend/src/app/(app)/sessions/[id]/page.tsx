@@ -12,6 +12,7 @@ import type { ProjectRole } from "@/lib/api/me";
 import { createClient } from "@/lib/supabase/server";
 import { initials } from "@/lib/initials";
 import { ProcessButton } from "./_process-button";
+import { RenderAllButton } from "./_render-all-button";
 import { SnippetsList } from "./_snippets-list";
 
 export default async function SessionDetailPage({
@@ -127,6 +128,23 @@ export default async function SessionDetailPage({
           )}
         </header>
 
+        {typeof session.job_status === "string" &&
+        session.job_status.startsWith("Failed") ? (
+          <Card className="border-destructive/40 bg-destructive/5">
+            <CardContent className="p-4 text-sm">
+              <p className="font-medium text-destructive">Pipeline failed</p>
+              <p className="mt-1 text-muted-foreground">
+                {session.job_status.replace(/^Failed:\s*/, "")}
+              </p>
+              {canWrite ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Click <strong>Retry</strong> above to re-run from scratch.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
         {session.background_image_url || session.speaker_image_url ? (
           <Card>
             <CardContent className="flex flex-wrap gap-3 p-4">
@@ -151,13 +169,18 @@ export default async function SessionDetailPage({
         ) : null}
 
         <section className="space-y-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
-              Snippets · {snippets.length}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Click a row to trim.
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
+                Snippets · {snippets.length}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Click a row to trim.
+              </p>
+            </div>
+            {canWrite && snippets.length > 0 ? (
+              <RenderAllButton sessionId={sessionId} count={snippets.length} />
+            ) : null}
           </div>
           <SnippetsList
             sessionId={sessionId}

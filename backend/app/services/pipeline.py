@@ -19,12 +19,16 @@ DB rows + storage objects persist between stages.
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 from app.db.supabase import get_supabase_admin
 from app.services import segment, source_cache, transcribe
+
+
+logger = logging.getLogger(__name__)
 
 
 def set_status(session_id: int, status: str) -> None:
@@ -79,8 +83,14 @@ def run_session_pipeline(session_id: int) -> None:
             ).eq("id", session_id).execute()
             set_status(session_id, "Finished")
         except NotImplementedError as exc:
+            logger.exception(
+                "pipeline stage not implemented", extra={"session_id": session_id}
+            )
             fail(session_id, str(exc))
         except Exception as exc:  # noqa: BLE001 — surface anything to the UI
+            logger.exception(
+                "pipeline failed", extra={"session_id": session_id}
+            )
             fail(session_id, f"unhandled error: {exc!s}")
 
 

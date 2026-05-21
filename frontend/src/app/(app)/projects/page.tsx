@@ -190,14 +190,13 @@ function ProjectRow({
               Members
             </Button>
             {isManager ? (
-              <>
-                <Button size="sm" variant="ghost">
-                  ✎ Rename
-                </Button>
-                <Button size="sm" variant="ghost" className="ml-auto text-destructive">
-                  🗑 Delete
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="ghost"
+                render={<Link href={`/projects/${id}`} />}
+              >
+                Manage
+              </Button>
             ) : null}
           </div>
         </div>

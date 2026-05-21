@@ -9,12 +9,16 @@ the public URL written back into `snippet.storage_link`.
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 
 from app.db.supabase import get_supabase_admin
 from app.services import fetch, pipeline, render, source_cache, storage
 from app.workers.celery_app import celery_app
+
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="process_session", acks_late=True)
@@ -29,7 +33,7 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
 
     Transient layout (inside a TemporaryDirectory):
         /tmp/snippet-XXXX/
-            source.mp4   ← downloaded from session.drive_link
+            source.mp4   ← from source cache (or Drive on first call)
             intro.mp4    ← downloaded from session.intro_video_url (optional)
             out.mp4      ← ffmpeg render output
 
@@ -40,7 +44,12 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
         - snippet.is_persisted = True
 
     Re-renders pick a fresh uuid suffix so existing viewers keep
-    streaming the old cut.
+    streaming the old cut. **On failure we do NOT touch is_persisted
+    or storage_link** — `_reconcile_snippets` keys off `is_persisted`
+    to decide whether to drop a row on the next pipeline run, and a
+    transient render failure shouldn't orphan an already-good clip.
+    We re-raise so Celery marks the task FAILED and the polling
+    endpoint surfaces the error to the UI.
     """
     client = get_supabase_admin()
     rows = (
@@ -103,8 +112,8 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
             ).eq("id", snippet_id).execute()
 
             return {"snippet_id": snippet_id, "status": "rendered"}
-        except Exception as exc:  # noqa: BLE001 — surface to caller
-            client.table("snippet").update({"is_persisted": False}).eq(
-                "id", snippet_id
-            ).execute()
-            return {"snippet_id": snippet_id, "status": f"failed: {exc!s}"}
+        except Exception:
+            logger.exception(
+                "render_snippet failed", extra={"snippet_id": snippet_id}
+            )
+            raise

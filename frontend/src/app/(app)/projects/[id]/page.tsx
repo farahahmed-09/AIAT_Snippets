@@ -39,12 +39,17 @@ type MemberRow = {
 
 export default async function ProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
+  const { tab } = await searchParams;
   const projectId = Number(id);
   if (!Number.isFinite(projectId)) notFound();
+  const initialTab =
+    tab === "members" || tab === "intros" || tab === "sessions" ? tab : "sessions";
 
   const supabase = await createClient();
   const {
@@ -161,7 +166,7 @@ export default async function ProjectDetailPage({
         ) : null}
       </header>
 
-      <Tabs defaultValue="sessions">
+      <Tabs defaultValue={initialTab}>
         <TabsList>
           <TabsTrigger value="sessions">
             Sessions{" "}

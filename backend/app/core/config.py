@@ -19,8 +19,15 @@ class Settings(BaseSettings):
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
 
-    # CORS
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    # CORS — defaults cover the two Next.js dev ports we use
+    # (`:3001` in Docker because VS Code's tunnel often binds `:3000`,
+    # and `:3000` for `npm run dev` outside Docker).
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:3001",
+            "http://localhost:3000",
+        ]
+    )
 
     # Supabase
     supabase_url: str

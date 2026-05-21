@@ -36,4 +36,8 @@ api_router.include_router(
 api_router.include_router(
     intro_assets.router, prefix="/intro-assets", tags=["intro-assets"]
 )
+# Task polling on its own prefix so /{snippet_id:int} can't shadow it.
+api_router.include_router(
+    snippets.tasks_router, prefix="/snippet-tasks", tags=["snippets"]
+)
 api_router.include_router(snippets.router, prefix="/snippets", tags=["snippets"])
