@@ -1,4 +1,19 @@
-from app.services import pipeline
+"""Celery tasks for the snippet pipeline.
+
+All artifacts (rendered clips, intermediate audio, fetched source video)
+are **transient** — they live under a per-task `TemporaryDirectory` and
+disappear when the task ends. The only durable home for a clip is
+Supabase Storage (`services.storage.upload_*`); the persisted handle is
+the public URL written back into `snippet.storage_link`.
+"""
+
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+
+from app.db.supabase import get_supabase_admin
+from app.services import pipeline, render, storage
 from app.workers.celery_app import celery_app
 
 
@@ -10,10 +25,69 @@ def process_session(session_id: int) -> dict[str, int | str]:
 
 @celery_app.task(name="render_snippet", acks_late=True)
 def render_snippet(snippet_id: int) -> dict[str, int | str]:
-    """Re-render a single snippet with its current trim.
+    """Render a single snippet with its current trim and persist the URL.
 
-    TODO: implement on top of services.render.render_snippet — download
-    source + intro to /tmp, render, upload to storage, update
-    snippet.storage_link.
+    Transient layout (inside a TemporaryDirectory):
+        /tmp/snippet-XXXX/
+            source.mp4   ← downloaded from session.drive_link
+            intro.mp4    ← downloaded from intro_asset (optional)
+            out.mp4      ← ffmpeg render output
+
+    Final state:
+        - out.mp4 uploaded to Supabase Storage at
+          snippets/<session_id>/<snippet_id>_<uuid>.mp4
+        - snippet.storage_link = public URL of that object
+        - snippet.is_persisted = True
+
+    Re-renders pick a fresh uuid suffix so existing viewers keep
+    streaming the old cut.
     """
-    return {"snippet_id": snippet_id, "status": "not_implemented"}
+    client = get_supabase_admin()
+    rows = (
+        client.table("snippet")
+        .select("*, session(drive_link, intro_video_url, speaker_name, "
+                "speaker_title, speaker_image_url, background_image_url)")
+        .eq("id", snippet_id)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not rows:
+        return {"snippet_id": snippet_id, "status": "missing"}
+    snippet = rows[0]
+    session = snippet.get("session") or {}
+
+    with tempfile.TemporaryDirectory(prefix=f"snippet-{snippet_id}-") as tmp:
+        workdir = Path(tmp)
+        try:
+            # TODO: pipeline._download_source(session["drive_link"], workdir / "source.mp4")
+            # TODO: optional intro download to workdir / "intro.mp4"
+            output_path = workdir / "out.mp4"
+            render.render_snippet(
+                render.RenderInputs(
+                    source_video_path=str(workdir / "source.mp4"),
+                    start_second=snippet["start_second"],
+                    end_second=snippet["end_second"],
+                    intro_video_path=None,
+                    speaker_name=session.get("speaker_name"),
+                    speaker_title=session.get("speaker_title"),
+                    speaker_image_path=None,
+                    background_image_path=None,
+                ),
+                output_path=str(output_path),
+            )
+
+            key = storage.make_snippet_path(snippet["session_id"], snippet_id)
+            storage.upload_file(key, str(output_path), content_type="video/mp4")
+            public_url = storage.public_url(key)
+
+            client.table("snippet").update(
+                {"storage_link": public_url, "is_persisted": True}
+            ).eq("id", snippet_id).execute()
+
+            return {"snippet_id": snippet_id, "status": "rendered"}
+        except NotImplementedError as exc:
+            client.table("snippet").update(
+                {"is_persisted": False, "storage_link": None}
+            ).eq("id", snippet_id).execute()
+            return {"snippet_id": snippet_id, "status": f"not_implemented: {exc}"}
