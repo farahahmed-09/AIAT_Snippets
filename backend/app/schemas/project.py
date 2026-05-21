@@ -41,3 +41,23 @@ class ProjectMembership(BaseModel):
 
     project: Project
     role: ProjectRole
+
+
+class Member(BaseModel):
+    """A row in `/projects/{id}/members` — project_members joined with profile."""
+
+    user_id: str
+    role: ProjectRole
+    joined_at: datetime
+    email: str | None
+    full_name: str | None
+    avatar_url: str | None
+
+
+class MemberCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    role: ProjectRole = "editor"
+
+
+class MemberRoleUpdate(BaseModel):
+    role: ProjectRole

@@ -7,6 +7,7 @@ from app.schemas.project import (
     ProjectMembership,
     ProjectUpdate,
 )
+from app.services import members as members_service
 from app.services import projects
 
 router = APIRouter()
@@ -20,6 +21,12 @@ def list_my_projects(user: CurrentUserDep) -> list[ProjectMembership]:
 @router.post("", response_model=Project, status_code=status.HTTP_201_CREATED)
 def create_project(payload: ProjectCreate, user: CurrentUserDep) -> Project:
     return projects.create(user.id, payload)
+
+
+@router.get("/{project_id}", response_model=ProjectMembership)
+def get_project(project_id: int, user: CurrentUserDep) -> ProjectMembership:
+    role = members_service._role_or_404(user.id, project_id)
+    return ProjectMembership(project=projects.get(project_id), role=role)
 
 
 @router.patch("/{project_id}", response_model=Project)

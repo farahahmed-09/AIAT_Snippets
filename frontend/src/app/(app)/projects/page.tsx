@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { NewProjectDialog } from "./_new-project-dialog";
 
 type MembershipRow = {
   role: "manager" | "editor" | "viewer";
@@ -37,13 +38,14 @@ export default async function ProjectsPage() {
 
   return (
     <div className="container mx-auto flex flex-1 flex-col gap-6 px-6 py-8">
-      <header className="flex items-baseline justify-between">
+      <header className="flex items-baseline justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground">
-            All projects you&apos;re a member of.
+            Every project you&apos;re a member of.
           </p>
         </div>
+        <NewProjectDialog />
       </header>
 
       {error ? (
@@ -58,10 +60,11 @@ export default async function ProjectsPage() {
           <CardHeader>
             <CardTitle>No projects yet</CardTitle>
             <CardDescription>
-              On signup the database creates a default project for you. If
-              you&apos;re seeing this, check that the
+              On signup the database creates a default project for you — if
+              you&apos;re seeing this, the
               <code className="mx-1">on_auth_user_create_default_project</code>
-              trigger ran in Supabase.
+              trigger didn&apos;t run. You can also start a fresh one with
+              <em> New project</em>.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -73,7 +76,9 @@ export default async function ProjectsPage() {
                 <Card className="h-full transition-colors hover:bg-accent/30">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-3">
-                      <CardTitle className="text-base">{project!.name}</CardTitle>
+                      <CardTitle className="text-base">
+                        {project!.name}
+                      </CardTitle>
                       <Badge variant={roleBadgeVariant[role]}>{role}</Badge>
                     </div>
                     {project!.description ? (
