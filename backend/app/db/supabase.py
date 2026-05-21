@@ -7,14 +7,14 @@ from app.core.config import get_settings
 
 @lru_cache
 def get_supabase_admin() -> Client:
-    """Service-role client. Bypasses RLS — keep server-side only."""
+    """Secret-key client. Bypasses RLS — keep server-side only."""
     settings = get_settings()
-    return create_client(settings.supabase_url, settings.supabase_service_key)
+    return create_client(settings.supabase_url, settings.supabase_secret_key)
 
 
 def get_supabase_user(access_token: str) -> Client:
     """Per-request client that runs under the caller's RLS context."""
     settings = get_settings()
-    client = create_client(settings.supabase_url, settings.supabase_anon_key)
+    client = create_client(settings.supabase_url, settings.supabase_publishable_key)
     client.postgrest.auth(access_token)
     return client

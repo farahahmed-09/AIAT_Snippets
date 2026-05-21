@@ -24,8 +24,8 @@ class Settings(BaseSettings):
 
     # Supabase
     supabase_url: str
-    supabase_anon_key: str
-    supabase_service_key: str
+    supabase_publishable_key: str
+    supabase_secret_key: str
     supabase_bucket: str = "snippets"
     supabase_jwt_secret: str
 

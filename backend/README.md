@@ -91,11 +91,12 @@ def me(user: CurrentUserDep) -> dict[str, str | None]:
 
 ## Two Supabase clients
 
-- **admin** — `get_supabase_admin()` — service-role key, bypasses RLS. Use
-  for cross-tenant background work (workers) and anywhere you've already
-  authorised the caller at the API layer.
-- **per-user** — `get_supabase_user(access_token)` — anon key + the caller's
-  JWT, so PostgREST applies the RLS policies defined in
+- **admin** — `get_supabase_admin()` — secret key (`sb_secret_*`), bypasses
+  RLS. Use for cross-tenant background work (workers) and anywhere you've
+  already authorised the caller at the API layer.
+- **per-user** — `get_supabase_user(access_token)` — publishable key
+  (`sb_publishable_*`) + the caller's JWT, so PostgREST applies the RLS
+  policies defined in
   [../supabase/migrations/20260521000004_projects.sql](../supabase/migrations/20260521000004_projects.sql) naturally.
 
 ## Porting from `old/src/`

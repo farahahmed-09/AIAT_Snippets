@@ -4,8 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
-os.environ.setdefault("SUPABASE_ANON_KEY", "test")
-os.environ.setdefault("SUPABASE_SERVICE_KEY", "test")
+os.environ.setdefault("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test")
+os.environ.setdefault("SUPABASE_SECRET_KEY", "sb_secret_test")
 os.environ.setdefault("SUPABASE_JWT_SECRET", "test-secret")
 
 
