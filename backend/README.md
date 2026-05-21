@@ -96,7 +96,7 @@ def me(user: CurrentUserDep) -> dict[str, str | None]:
   authorised the caller at the API layer.
 - **per-user** — `get_supabase_user(access_token)` — anon key + the caller's
   JWT, so PostgREST applies the RLS policies defined in
-  [../db/04_projects.sql](../db/04_projects.sql) naturally.
+  [../supabase/migrations/20260521000004_projects.sql](../supabase/migrations/20260521000004_projects.sql) naturally.
 
 ## Porting from `old/src/`
 

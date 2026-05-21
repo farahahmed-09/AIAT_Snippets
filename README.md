@@ -13,7 +13,7 @@ templates incrementally.
 .
 ├── frontend/   Next.js 16 (App Router) + Tailwind 4 + shadcn/ui + Supabase Auth
 ├── backend/    FastAPI 0.136+ + Celery + Supabase + structlog
-├── db/         Supabase SQL bootstrap (run once per project)
+├── supabase/   Supabase CLI project — migrations live in supabase/migrations/
 ├── old/        Legacy code, kept for porting reference (gitignored)
 └── docker-compose.yml
 ```
@@ -24,8 +24,10 @@ The compose file boots five services: `redis`, `backend`, `worker`, `beat`,
 `frontend`.
 
 ```bash
-# 1. Set up Supabase: run db/01_schema.sql, db/02_storage.sql,
-#    db/03_auth.sql, db/04_projects.sql in the SQL editor.
+# 1. Set up Supabase: create a new project, then
+#    supabase link --project-ref <project-ref>
+#    supabase db push
+#    (see supabase/migrations/README.md for details)
 
 # 2. Create env files
 cp .env.example .env                       # NEXT_PUBLIC_* baked into the Next build
