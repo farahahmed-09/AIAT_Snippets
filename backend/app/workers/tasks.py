@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 from app.db.supabase import get_supabase_admin
-from app.services import pipeline, render, storage
+from app.services import fetch, pipeline, render, storage
 from app.workers.celery_app import celery_app
 
 
@@ -30,7 +30,7 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
     Transient layout (inside a TemporaryDirectory):
         /tmp/snippet-XXXX/
             source.mp4   ← downloaded from session.drive_link
-            intro.mp4    ← downloaded from intro_asset (optional)
+            intro.mp4    ← downloaded from session.intro_video_url (optional)
             out.mp4      ← ffmpeg render output
 
     Final state:
@@ -45,8 +45,10 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
     client = get_supabase_admin()
     rows = (
         client.table("snippet")
-        .select("*, session(drive_link, intro_video_url, speaker_name, "
-                "speaker_title, speaker_image_url, background_image_url)")
+        .select(
+            "*, session(drive_link, intro_video_url, speaker_name, "
+            "speaker_title, speaker_image_url, background_image_url)"
+        )
         .eq("id", snippet_id)
         .limit(1)
         .execute()
@@ -60,15 +62,21 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
     with tempfile.TemporaryDirectory(prefix=f"snippet-{snippet_id}-") as tmp:
         workdir = Path(tmp)
         try:
-            # TODO: pipeline._download_source(session["drive_link"], workdir / "source.mp4")
-            # TODO: optional intro download to workdir / "intro.mp4"
+            source_path = workdir / "source.mp4"
+            fetch.fetch_to_disk(session["drive_link"], source_path)
+
+            intro_path: Path | None = None
+            if session.get("intro_video_url"):
+                intro_path = workdir / "intro.mp4"
+                fetch.fetch_to_disk(session["intro_video_url"], intro_path)
+
             output_path = workdir / "out.mp4"
             render.render_snippet(
                 render.RenderInputs(
-                    source_video_path=str(workdir / "source.mp4"),
+                    source_video_path=str(source_path),
                     start_second=snippet["start_second"],
                     end_second=snippet["end_second"],
-                    intro_video_path=None,
+                    intro_video_path=str(intro_path) if intro_path else None,
                     speaker_name=session.get("speaker_name"),
                     speaker_title=session.get("speaker_title"),
                     speaker_image_path=None,
@@ -86,8 +94,8 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
             ).eq("id", snippet_id).execute()
 
             return {"snippet_id": snippet_id, "status": "rendered"}
-        except NotImplementedError as exc:
-            client.table("snippet").update(
-                {"is_persisted": False, "storage_link": None}
-            ).eq("id", snippet_id).execute()
-            return {"snippet_id": snippet_id, "status": f"not_implemented: {exc}"}
+        except Exception as exc:  # noqa: BLE001 — surface to caller
+            client.table("snippet").update({"is_persisted": False}).eq(
+                "id", snippet_id
+            ).execute()
+            return {"snippet_id": snippet_id, "status": f"failed: {exc!s}"}
