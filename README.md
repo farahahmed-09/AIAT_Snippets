@@ -27,7 +27,7 @@ The compose file boots five services: `redis`, `backend`, `worker`, `beat`,
 # 1. Set up Supabase: create a new project, then
 #    supabase link --project-ref <project-ref>
 #    supabase db push
-#    (see supabase/migrations/README.md for details)
+#    (see supabase/README.md for details)
 
 # 2. Create env files
 cp .env.example .env                       # NEXT_PUBLIC_* baked into the Next build
