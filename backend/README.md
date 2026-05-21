@@ -54,7 +54,7 @@ tests/
 
 ```bash
 cp .env.example .env
-# fill in SUPABASE_* and SUPABASE_JWT_SECRET
+# fill in SUPABASE_*
 
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
@@ -79,8 +79,10 @@ pytest
 ## Auth
 
 The `get_current_user` dependency in [app/core/security.py](app/core/security.py)
-verifies the Supabase JWT (HS256) using `SUPABASE_JWT_SECRET` and returns a
-`CurrentUser(id, email)`. Use the `CurrentUserDep` alias in
+verifies the Supabase user JWT against the project's JWKS endpoint
+(`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`) using ES256, and returns a
+`CurrentUser(id, email)`. Public keys are fetched once and cached. No shared
+JWT secret is needed. Use the `CurrentUserDep` alias in
 [app/api/deps.py](app/api/deps.py) on any protected endpoint:
 
 ```python

@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     supabase_publishable_key: str
     supabase_secret_key: str
     supabase_bucket: str = "snippets"
-    supabase_jwt_secret: str
 
     # Celery / Redis
     redis_url: str = "redis://localhost:6379/0"
