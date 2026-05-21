@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/tabs";
 import { createClient } from "@/lib/supabase/server";
 import type { ProjectRole } from "@/lib/api/me";
+import type { IntroAsset } from "@/lib/api/intro-assets";
 import type { Session } from "@/lib/api/sessions";
+import { IntrosTab } from "./_intros-tab";
 import { MembersTab } from "./_members-tab";
 import { ProjectActions } from "./_project-actions";
 import { SessionsTab } from "./_sessions-tab";
@@ -99,6 +101,35 @@ export default async function ProjectDetailPage({
     .order("created_at", { ascending: false })) as { data: Session[] | null };
   const sessions = sessionRows ?? [];
 
+  const { data: introRows } = (await supabase
+    .from("intro_asset")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })) as {
+    data: Array<{
+      id: number;
+      project_id: number;
+      name: string;
+      video_path: string;
+      thumbnail_path: string | null;
+      created_by: string | null;
+      created_at: string;
+    }> | null;
+  };
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const bucket = "snippets";
+  const intros: IntroAsset[] = (introRows ?? []).map((r) => ({
+    id: r.id,
+    project_id: r.project_id,
+    name: r.name,
+    video_url: `${supabaseUrl}/storage/v1/object/public/${bucket}/${r.video_path}`,
+    thumbnail_url: r.thumbnail_path
+      ? `${supabaseUrl}/storage/v1/object/public/${bucket}/${r.thumbnail_path}`
+      : null,
+    created_by: r.created_by,
+    created_at: r.created_at,
+  }));
+
   return (
     <div className="container mx-auto flex flex-1 flex-col gap-6 px-6 py-8">
       <Button
@@ -139,6 +170,10 @@ export default async function ProjectDetailPage({
             Sessions{" "}
             <span className="ml-1 text-xs opacity-60">{sessions.length}</span>
           </TabsTrigger>
+          <TabsTrigger value="intros">
+            Intros{" "}
+            <span className="ml-1 text-xs opacity-60">{intros.length}</span>
+          </TabsTrigger>
           <TabsTrigger value="members">
             Members <span className="ml-1 text-xs opacity-60">{members.length}</span>
           </TabsTrigger>
@@ -149,6 +184,14 @@ export default async function ProjectDetailPage({
             myUserId={user.id}
             myRole={myRole}
             initialSessions={sessions}
+          />
+        </TabsContent>
+        <TabsContent value="intros" className="pt-4">
+          <IntrosTab
+            projectId={projectId}
+            myUserId={user.id}
+            myRole={myRole}
+            initialAssets={intros}
           />
         </TabsContent>
         <TabsContent value="members" className="pt-4">
