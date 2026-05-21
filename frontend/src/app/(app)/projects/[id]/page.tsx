@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import {
   Tabs,
@@ -8,6 +8,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { RoleBadge } from "@/components/role-badge";
 import { createClient } from "@/lib/supabase/server";
 import type { ProjectRole } from "@/lib/api/me";
 import type { IntroAsset } from "@/lib/api/intro-assets";
@@ -34,15 +35,6 @@ type MemberRow = {
     full_name: string | null;
     avatar_url: string | null;
   } | null;
-};
-
-const roleBadgeVariant: Record<
-  ProjectRole,
-  "default" | "secondary" | "outline"
-> = {
-  manager: "default",
-  editor: "secondary",
-  viewer: "outline",
 };
 
 export default async function ProjectDetailPage({
@@ -131,23 +123,28 @@ export default async function ProjectDetailPage({
   }));
 
   return (
-    <div className="container mx-auto flex flex-1 flex-col gap-6 px-6 py-8">
+    <>
+      <AppHeader activeProjectId={projectId} />
+      <main className="container mx-auto flex flex-1 flex-col gap-6 px-6 py-8">
       <Button
         variant="ghost"
         size="sm"
         className="-ml-2 w-fit"
         render={<Link href="/projects" />}
       >
-        ← All projects
+        ‹ back to projects
       </Button>
 
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+            Project
+          </p>
+          <div className="mt-1 flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">
               {project.name}
             </h1>
-            <Badge variant={roleBadgeVariant[myRole]}>{myRole}</Badge>
+            <RoleBadge role={myRole} withDot />
           </div>
           {project.description ? (
             <p className="mt-1 text-sm text-muted-foreground">
@@ -197,12 +194,14 @@ export default async function ProjectDetailPage({
         <TabsContent value="members" className="pt-4">
           <MembersTab
             projectId={projectId}
+            projectName={project.name}
             myUserId={user.id}
             myRole={myRole}
             initialMembers={members}
           />
         </TabsContent>
       </Tabs>
-    </div>
+      </main>
+    </>
   );
 }

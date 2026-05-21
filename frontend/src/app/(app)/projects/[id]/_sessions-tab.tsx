@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
+import { ArrowUpRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import {
   deleteSession,
   listProjectSessions,
-  statusVariant,
   type Session,
 } from "@/lib/api/sessions";
 import type { ProjectRole } from "@/lib/api/me";
@@ -84,51 +84,55 @@ export function SessionsTab({
           </CardHeader>
         </Card>
       ) : (
-        <ul className="space-y-3">
-          {sessions.map((s) => (
+        <ul className="space-y-2">
+          {sessions.map((s, i) => (
             <li key={s.id}>
-              <Card className="transition-colors hover:bg-accent/30">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+              <Card className="transition-colors hover:bg-accent/20">
+                <CardHeader className="flex flex-row items-center gap-4 p-4">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    #{String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
                       <Link
                         href={`/sessions/${s.id}`}
-                        className="font-medium hover:underline"
+                        className="truncate font-medium hover:underline"
                       >
                         {s.name}
                       </Link>
                       {s.module ? (
-                        <Badge variant="secondary" className="ml-2">
-                          {s.module}
-                        </Badge>
-                      ) : null}
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Created{" "}
-                        {formatDistanceToNow(new Date(s.created_at), {
-                          addSuffix: true,
-                        })}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={statusVariant(s.job_status)}>
-                        {s.job_status}
-                      </Badge>
-                      {canDelete(s) ? (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (confirm(`Delete “${s.name}”?`))
-                              deleteMutation.mutate(s.id);
-                          }}
-                          aria-label="Delete session"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                        <Badge variant="secondary">{s.module}</Badge>
                       ) : null}
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNowStrict(new Date(s.created_at), {
+                        addSuffix: true,
+                      })}
+                    </p>
                   </div>
+                  <StatusBadge status={s.job_status} />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    render={<Link href={`/sessions/${s.id}`} />}
+                    aria-label="Open session"
+                  >
+                    <ArrowUpRight className="size-4" />
+                  </Button>
+                  {canDelete(s) ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (confirm(`Delete “${s.name}”?`))
+                          deleteMutation.mutate(s.id);
+                      }}
+                      aria-label="Delete session"
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  ) : null}
                 </CardHeader>
               </Card>
             </li>

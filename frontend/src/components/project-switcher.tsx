@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChevronDown, FolderPlus, Hash, Plus, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -25,25 +23,30 @@ export type ProjectOption = {
 type Props = {
   active: ProjectOption;
   projects: ProjectOption[];
+  /** Called with the selected project id. The caller owns the route. */
+  onSelect: (id: number) => void;
+  onCreate?: () => void;
+  onManage?: () => void;
 };
 
-export function ProjectSwitcher({ active, projects }: Props) {
-  const router = useRouter();
+export function ProjectSwitcher({
+  active,
+  projects,
+  onSelect,
+  onCreate,
+  onManage,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q
-      ? projects.filter((p) => p.name.toLowerCase().includes(q))
-      : projects;
+    return q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
   }, [projects, query]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm hover:bg-accent"
-      >
+      <PopoverTrigger className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm hover:bg-accent">
         <Hash className="size-3.5 text-muted-foreground" />
         <span className="font-medium">{active.name}</span>
         <RoleBadge role={active.role} />
@@ -72,7 +75,7 @@ export function ProjectSwitcher({ active, projects }: Props) {
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    router.push(`/projects/${p.id}`);
+                    onSelect(p.id);
                   }}
                   className={cn(
                     "flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-accent",
@@ -82,7 +85,9 @@ export function ProjectSwitcher({ active, projects }: Props) {
                   <span
                     className={cn(
                       "size-1.5 rounded-full",
-                      isActive ? "bg-primary" : "bg-transparent border border-border",
+                      isActive
+                        ? "bg-primary"
+                        : "border border-border bg-transparent",
                     )}
                   />
                   <span className="flex-1 truncate">{p.name}</span>
@@ -102,26 +107,38 @@ export function ProjectSwitcher({ active, projects }: Props) {
             </li>
           ) : null}
         </ul>
-        <div className="border-t">
-          <Link
-            href="/projects?new=1"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-accent"
-          >
-            <Plus className="size-3.5 text-muted-foreground" />
-            <span className="flex-1">Create project</span>
-            <Kbd>⌘N</Kbd>
-          </Link>
-          <Link
-            href="/projects"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-accent"
-          >
-            <Settings className="size-3.5 text-muted-foreground" />
-            <span className="flex-1">Manage projects</span>
-            <FolderPlus className="size-3.5 text-muted-foreground" />
-          </Link>
-        </div>
+        {onCreate || onManage ? (
+          <div className="border-t">
+            {onCreate ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onCreate();
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-accent"
+              >
+                <Plus className="size-3.5 text-muted-foreground" />
+                <span className="flex-1 text-left">Create project</span>
+                <Kbd>⌘N</Kbd>
+              </button>
+            ) : null}
+            {onManage ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onManage();
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-accent"
+              >
+                <Settings className="size-3.5 text-muted-foreground" />
+                <span className="flex-1 text-left">Manage projects</span>
+                <FolderPlus className="size-3.5 text-muted-foreground" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

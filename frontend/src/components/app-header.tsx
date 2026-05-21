@@ -1,16 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { AppHeaderActions } from "@/components/app-header-actions";
 import { LogoMark } from "@/components/logo-mark";
-import { ProjectSwitcher, type ProjectOption } from "@/components/project-switcher";
 import { UserMenu } from "@/components/user-menu";
+import type { ProjectOption } from "@/components/project-switcher";
 import type { ProjectRole } from "@/lib/api/me";
 
 type MembershipRow = {
   role: ProjectRole;
-  projects: {
-    id: number;
-    name: string;
-  } | null;
+  projects: { id: number; name: string } | null;
 };
 
 export async function AppHeader({
@@ -46,7 +44,7 @@ export async function AppHeader({
       role: r.role,
     }));
 
-  const active = projects.find((p) => p.id === activeProjectId) ?? projects[0];
+  const active = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? null;
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
@@ -54,18 +52,12 @@ export async function AppHeader({
         <Link href="/projects" className="shrink-0">
           <LogoMark />
         </Link>
-        {active ? (
-          <>
-            <span className="text-muted-foreground">·</span>
-            <ProjectSwitcher active={active} projects={projects} />
-          </>
-        ) : null}
+        {active ? <span className="text-muted-foreground">·</span> : null}
+        <AppHeaderActions active={active} projects={projects} />
         {breadcrumb ? (
           <>
             <span className="text-muted-foreground">›</span>
-            <div className="min-w-0 text-sm text-muted-foreground">
-              {breadcrumb}
-            </div>
+            <div className="min-w-0 text-sm text-muted-foreground">{breadcrumb}</div>
           </>
         ) : null}
         <div className="ml-auto flex items-center gap-2">

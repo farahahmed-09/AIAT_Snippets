@@ -41,6 +41,7 @@ const roleBadgeVariant: Record<
 
 type Props = {
   projectId: number;
+  projectName: string;
   myUserId: string;
   myRole: ProjectRole;
   initialMembers: Member[];
@@ -48,6 +49,7 @@ type Props = {
 
 export function MembersTab({
   projectId,
+  projectName,
   myUserId,
   myRole,
   initialMembers,
@@ -89,7 +91,9 @@ export function MembersTab({
         <p className="text-sm text-muted-foreground">
           {members.length} member{members.length === 1 ? "" : "s"}
         </p>
-        {isManager ? <InviteMemberDialog projectId={projectId} /> : null}
+        {isManager ? (
+          <InviteMemberDialog projectId={projectId} projectName={projectName} />
+        ) : null}
       </div>
 
       <div className="rounded-md border">
