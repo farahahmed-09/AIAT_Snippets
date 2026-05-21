@@ -9,7 +9,7 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/sessions");
+  if (user) redirect("/projects");
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
@@ -18,11 +18,9 @@ export default async function Home() {
         Turn long lectures and webinars into branded short clips, automatically.
       </p>
       <div className="flex gap-3">
-        <Button asChild>
-          <Link href="/sign-in">Sign in</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/sign-up">Create an account</Link>
+        <Button render={<Link href="/sign-in" />}>Sign in</Button>
+        <Button render={<Link href="/sign-up" />} variant="outline">
+          Create an account
         </Button>
       </div>
     </main>
