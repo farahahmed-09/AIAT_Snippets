@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 from app.db.supabase import get_supabase_admin
-from app.services import fetch, pipeline, render, storage
+from app.services import fetch, pipeline, render, source_cache, storage
 from app.workers.celery_app import celery_app
 
 
@@ -62,8 +62,9 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
     with tempfile.TemporaryDirectory(prefix=f"snippet-{snippet_id}-") as tmp:
         workdir = Path(tmp)
         try:
-            source_path = workdir / "source.mp4"
-            fetch.fetch_to_disk(session["drive_link"], source_path)
+            source_path = source_cache.materialise_source(
+                snippet["session_id"], session["drive_link"], workdir
+            )
 
             intro_path: Path | None = None
             if session.get("intro_video_url"):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUserDep
 from app.schemas.session import Session, SessionCreate, SessionUpdate
@@ -25,13 +25,44 @@ def update_session(
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(session_id: int, user: CurrentUserDep) -> None:
+    row = sessions._fetch_session_with_access(user.id, session_id, write=True)
+    job = row.get("job_status") or ""
+    if job == "Pending" or job.startswith("Processing"):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Cannot delete a session that is currently {job}.",
+        )
     sessions.delete(user.id, session_id)
 
 
 @router.post("/{session_id}/process")
 def trigger_processing(session_id: int, user: CurrentUserDep) -> dict[str, str]:
     # Auth gate — raises 404/403 if the caller can't write this session.
-    sessions._fetch_session_with_access(user.id, session_id, write=True)
+    row = sessions._fetch_session_with_access(user.id, session_id, write=True)
+    job = row.get("job_status") or ""
+    if job == "Pending" or job.startswith("Processing"):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Session is already {job}; wait for it to finish or fail.",
+        )
+    task = process_session_task.delay(session_id)
+    return {"task_id": task.id, "status": "queued"}
+
+
+@router.post("/{session_id}/retry")
+def retry_session(session_id: int, user: CurrentUserDep) -> dict[str, str]:
+    """Retry a Failed session.
+
+    Mirrors the old `/sessions/{id}/retry`: only Failed sessions are
+    retriable; in-flight ones return 409 so we don't queue duplicates.
+    """
+    row = sessions._fetch_session_with_access(user.id, session_id, write=True)
+    job = row.get("job_status") or ""
+    if not job.startswith("Failed"):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Only Failed sessions can be retried; current status is {job!r}.",
+        )
     task = process_session_task.delay(session_id)
     return {"task_id": task.id, "status": "queued"}
 

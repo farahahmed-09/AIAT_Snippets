@@ -7,24 +7,32 @@ Two paths:
     "anyone with the link".
 
   - **Authenticated** (`download_with_token`): direct call to
-    `files/{id}?alt=media` with a `Bearer` OAuth token. Plug this in
-    when the caller (a user who signed in via Google) is willing to
-    surface their `provider_token` to the backend — e.g., the frontend
-    passes `supabase.auth.getSession().provider_token` on the
-    create-session request and we forward it to the worker.
+    `files/{id}?alt=media` with a `Bearer` OAuth token. Wired for when
+    the frontend passes `supabase.auth.getSession().provider_token`
+    through the API.
 
-The split keeps the simple case simple while leaving an easy upgrade
-path for private files.
+Hardening notes:
+
+  - **Hostname is checked** before the regex extraction: only
+    `drive.google.com` and `docs.google.com` are accepted. Without
+    this, a URL like `https://evil.example.com/?id=AAA` would still
+    match the second `[?&]id=` pattern and be handed to gdown.
+  - **`fuzzy=False`** when calling `gdown.download`. We've already
+    extracted the file id; fuzzy mode lets gdown follow alternative
+    URL shapes (including some that scrape arbitrary HTML), which we
+    don't need.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import gdown
 import httpx
 
+_ALLOWED_HOSTS = ("drive.google.com", "docs.google.com")
 
 _ID_PATTERNS = (
     re.compile(r"/file/d/([A-Za-z0-9_-]+)"),
@@ -32,7 +40,19 @@ _ID_PATTERNS = (
 )
 
 
+def is_drive_url(url: str) -> bool:
+    """Stricter than the previous substring check — parses the URL and
+    matches the hostname against a fixed allow-list."""
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return False
+    return host in _ALLOWED_HOSTS or any(host.endswith("." + h) for h in _ALLOWED_HOSTS)
+
+
 def extract_file_id(drive_link: str) -> str:
+    if not is_drive_url(drive_link):
+        raise ValueError(f"Not a Google Drive URL: {drive_link}")
     for pat in _ID_PATTERNS:
         m = pat.search(drive_link)
         if m:
@@ -45,9 +65,12 @@ def download(drive_link: str, dest_path: str | Path) -> Path:
     file_id = extract_file_id(drive_link)
     out = Path(dest_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    gdown.download(id=file_id, output=str(out), quiet=True, fuzzy=True)
+    gdown.download(id=file_id, output=str(out), quiet=True, fuzzy=False)
     if not out.exists() or out.stat().st_size == 0:
-        raise RuntimeError(f"Public Drive download produced no file: id={file_id}")
+        raise RuntimeError(
+            f"Public Drive download produced no file: id={file_id}. "
+            "Confirm the file is shared as 'Anyone with the link'."
+        )
     return out
 
 
@@ -66,7 +89,8 @@ def download_with_token(
     out.parent.mkdir(parents=True, exist_ok=True)
 
     url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
-    with httpx.Client(timeout=300, follow_redirects=True) as client:
+    timeout = httpx.Timeout(connect=30, read=300, write=300, pool=None)
+    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
         with client.stream(
             "GET",
             url,
@@ -79,5 +103,7 @@ def download_with_token(
                     fh.write(chunk)
 
     if not out.exists() or out.stat().st_size == 0:
-        raise RuntimeError(f"Authenticated Drive download produced no file: id={file_id}")
+        raise RuntimeError(
+            f"Authenticated Drive download produced no file: id={file_id}"
+        )
     return out
