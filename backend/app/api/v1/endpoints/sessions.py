@@ -1,27 +1,46 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
 from app.api.deps import CurrentUserDep
-from app.schemas.session import Session, SessionCreate
+from app.schemas.session import Session, SessionCreate, SessionUpdate
+from app.services import sessions
 
+# Routes here are mounted at /sessions/* — project-scoped collection
+# endpoints (list/create) live under /projects/{project_id}/sessions
+# and are exposed via a separate sub-router (see router.py).
 router = APIRouter()
 
 
-@router.get("", response_model=list[Session])
-def list_sessions(user: CurrentUserDep) -> list[Session]:
-    """List sessions for the caller's active project.
-
-    TODO: port from old/src/app/api/routes/sessions.py. Should filter by
-    project membership; the supabase admin client bypasses RLS, so the
-    project scope has to be enforced here explicitly.
-    """
-    _ = user
-    return []
+@router.get("/{session_id}", response_model=Session)
+def get_session(session_id: int, user: CurrentUserDep) -> Session:
+    return sessions.get(user.id, session_id)
 
 
-@router.post("", response_model=Session, status_code=201)
-def create_session(payload: SessionCreate, user: CurrentUserDep) -> Session:
-    """Create a session and kick off the processing pipeline.
+@router.patch("/{session_id}", response_model=Session)
+def update_session(
+    session_id: int, payload: SessionUpdate, user: CurrentUserDep
+) -> Session:
+    return sessions.update(user.id, session_id, payload)
 
-    TODO: port from old/src/app/api/routes/sessions.py (upload-session).
-    """
-    raise NotImplementedError
+
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(session_id: int, user: CurrentUserDep) -> None:
+    sessions.delete(user.id, session_id)
+
+
+# Project-scoped collection — kept in this module but mounted at
+# /projects/{project_id}/sessions in router.py.
+project_scoped_router = APIRouter()
+
+
+@project_scoped_router.get("", response_model=list[Session])
+def list_project_sessions(project_id: int, user: CurrentUserDep) -> list[Session]:
+    return sessions.list_for_project(user.id, project_id)
+
+
+@project_scoped_router.post(
+    "", response_model=Session, status_code=status.HTTP_201_CREATED
+)
+def create_session(
+    project_id: int, payload: SessionCreate, user: CurrentUserDep
+) -> Session:
+    return sessions.create(user.id, project_id, payload)

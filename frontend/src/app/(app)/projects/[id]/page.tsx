@@ -10,8 +10,10 @@ import {
 } from "@/components/ui/tabs";
 import { createClient } from "@/lib/supabase/server";
 import type { ProjectRole } from "@/lib/api/me";
+import type { Session } from "@/lib/api/sessions";
 import { MembersTab } from "./_members-tab";
 import { ProjectActions } from "./_project-actions";
+import { SessionsTab } from "./_sessions-tab";
 
 type ProjectRow = {
   id: number;
@@ -90,6 +92,13 @@ export default async function ProjectDetailPage({
       avatar_url: r.profiles?.avatar_url ?? null,
     })) ?? [];
 
+  const { data: sessionRows } = (await supabase
+    .from("session")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })) as { data: Session[] | null };
+  const sessions = sessionRows ?? [];
+
   return (
     <div className="container mx-auto flex flex-1 flex-col gap-6 px-6 py-8">
       <Button
@@ -126,15 +135,21 @@ export default async function ProjectDetailPage({
 
       <Tabs defaultValue="sessions">
         <TabsList>
-          <TabsTrigger value="sessions">Sessions</TabsTrigger>
+          <TabsTrigger value="sessions">
+            Sessions{" "}
+            <span className="ml-1 text-xs opacity-60">{sessions.length}</span>
+          </TabsTrigger>
           <TabsTrigger value="members">
             Members <span className="ml-1 text-xs opacity-60">{members.length}</span>
           </TabsTrigger>
         </TabsList>
         <TabsContent value="sessions" className="pt-4">
-          <p className="text-sm text-muted-foreground">
-            Sessions will land here once the upload flow is wired (Phase 3).
-          </p>
+          <SessionsTab
+            projectId={projectId}
+            myUserId={user.id}
+            myRole={myRole}
+            initialSessions={sessions}
+          />
         </TabsContent>
         <TabsContent value="members" className="pt-4">
           <MembersTab
