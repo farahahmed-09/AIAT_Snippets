@@ -119,10 +119,9 @@ export function InviteMemberDialog({
                   className={cn(
                     "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs",
                     c.valid
-                      ? "border-primary/40 bg-primary/10 text-primary-foreground"
+                      ? "border-primary bg-primary text-primary-foreground"
                       : "border-destructive/40 bg-destructive/10 text-destructive",
                   )}
-                  style={c.valid ? { color: "var(--primary)" } : undefined}
                 >
                   {c.value}
                   <button
