@@ -16,7 +16,10 @@ RUN pip install --upgrade pip && pip install .
 
 COPY app ./app
 
-RUN groupadd --system --gid 1001 app && useradd --system --uid 1001 --gid app app
+RUN groupadd --system --gid 1001 app \
+    && useradd --system --uid 1001 --gid app app \
+    && mkdir -p /app/beat \
+    && chown -R app:app /app
 USER app
 
 EXPOSE 8000
