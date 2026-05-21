@@ -12,14 +12,16 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN pip install --upgrade pip && pip install .
+COPY ai_core ./ai_core
+RUN pip install --upgrade pip && pip install ./ai_core && pip install .
 
 COPY app ./app
 
 RUN groupadd --system --gid 1001 app \
-    && useradd --system --uid 1001 --gid app app \
-    && mkdir -p /app/beat \
+    && useradd --system --uid 1001 --gid app -d /app -s /usr/sbin/nologin app \
+    && mkdir -p /app/beat /app/.cache \
     && chown -R app:app /app
+ENV HOME=/app XDG_CACHE_HOME=/app/.cache
 USER app
 
 EXPOSE 8000
