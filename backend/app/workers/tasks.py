@@ -46,7 +46,7 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
     rows = (
         client.table("snippet")
         .select(
-            "*, session(drive_link, intro_video_url, speaker_name, "
+            "*, session(name, drive_link, intro_video_url, speaker_name, "
             "speaker_title, speaker_image_url, background_image_url)"
         )
         .eq("id", snippet_id)
@@ -70,6 +70,11 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
                 intro_path = workdir / "intro.mp4"
                 fetch.fetch_to_disk(session["intro_video_url"], intro_path)
 
+            speaker_image_path: Path | None = None
+            if session.get("speaker_image_url"):
+                speaker_image_path = workdir / "speaker.png"
+                fetch.fetch_to_disk(session["speaker_image_url"], speaker_image_path)
+
             output_path = workdir / "out.mp4"
             render.render_snippet(
                 render.RenderInputs(
@@ -79,8 +84,11 @@ def render_snippet(snippet_id: int) -> dict[str, int | str]:
                     intro_video_path=str(intro_path) if intro_path else None,
                     speaker_name=session.get("speaker_name"),
                     speaker_title=session.get("speaker_title"),
-                    speaker_image_path=None,
+                    speaker_image_path=(
+                        str(speaker_image_path) if speaker_image_path else None
+                    ),
                     background_image_path=None,
+                    video_title=snippet.get("name") or session.get("name"),
                 ),
                 output_path=str(output_path),
             )

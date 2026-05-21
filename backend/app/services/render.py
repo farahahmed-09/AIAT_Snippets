@@ -2,16 +2,16 @@
 
 Composition (in order):
 
-    [optional intro video] ⊕ [source trimmed to (start, end) with optional
-                              speaker name/title text overlay]
+    [branded intro = intro video + speaker overlays + circular profile]
+    ⊕
+    [source trimmed to (start, end)]
 
-Re-encodes through libx264 + AAC so the concat works across mismatched
-codecs and so the trim cuts on exact frames (not the keyframe nearest
-the requested timestamp).
+`services.intro.build_branded_intro` produces the branded intro via
+PIL-rendered PNGs and ffmpeg `overlay`; this module trims the source
+slice and concats. When there is no intro, we just emit the trimmed
+slice.
 
-Pure subprocess; no ffmpeg-python dep. Keeps the image lean. Image
-overlays (speaker avatar, background card) come in a follow-up — they
-need extra positioning math we'll write once the visual spec is final.
+Pure subprocess; no ffmpeg-python dep.
 """
 
 from __future__ import annotations
@@ -21,8 +21,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-
-_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+from app.services.intro import IntroBranding, build_branded_intro
 
 
 @dataclass(frozen=True)
@@ -35,6 +34,7 @@ class RenderInputs:
     speaker_title: str | None = None
     speaker_image_path: str | None = None
     background_image_path: str | None = None
+    video_title: str | None = None
 
 
 def render_snippet(inputs: RenderInputs, *, output_path: str) -> str:
@@ -50,8 +50,21 @@ def render_snippet(inputs: RenderInputs, *, output_path: str) -> str:
     _extract_slice(inputs, slice_path)
 
     if inputs.intro_video_path:
-        _concat_intro(Path(inputs.intro_video_path), slice_path, Path(output_path))
+        branded_intro = workdir / "_intro_branded.mp4"
+        build_branded_intro(
+            inputs.intro_video_path,
+            IntroBranding(
+                speaker_name=inputs.speaker_name,
+                speaker_title=inputs.speaker_title,
+                video_title=inputs.video_title,
+                profile_image_path=inputs.speaker_image_path,
+            ),
+            workdir=workdir,
+            output_path=branded_intro,
+        )
+        _concat(branded_intro, slice_path, Path(output_path))
         slice_path.unlink(missing_ok=True)
+        branded_intro.unlink(missing_ok=True)
     else:
         shutil.move(slice_path, output_path)
 
@@ -62,24 +75,18 @@ def render_snippet(inputs: RenderInputs, *, output_path: str) -> str:
 
 
 def _extract_slice(inputs: RenderInputs, dest: Path) -> None:
-    """Trim the source to [start, end] and stamp the speaker overlay.
+    """Trim the source to [start, end] precisely.
 
-    `-ss` before `-i` is the fast seek; we follow with `-to` which
-    re-encodes from the keyframe nearest start through the exact end,
-    so cuts land on the requested frame.
+    `-ss` *after* `-i` is the accurate seek — re-encodes from the
+    requested frame, not from the prior keyframe.
     """
-    vf = _drawtext_filter(inputs.speaker_name, inputs.speaker_title)
     args = [
         "ffmpeg",
         "-y",
         "-loglevel", "error",
+        "-i", inputs.source_video_path,
         "-ss", str(inputs.start_second),
         "-to", str(inputs.end_second),
-        "-i", inputs.source_video_path,
-    ]
-    if vf:
-        args += ["-vf", vf]
-    args += [
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "20",
@@ -91,11 +98,12 @@ def _extract_slice(inputs: RenderInputs, dest: Path) -> None:
     subprocess.run(args, check=True)
 
 
-def _concat_intro(intro: Path, slice_: Path, dest: Path) -> None:
-    """Re-encode-concat the intro and the trimmed slice into `dest`.
+def _concat(intro: Path, slice_: Path, dest: Path) -> None:
+    """Re-encode-concat the branded intro and the trimmed slice.
 
     `concat` filter (not the demuxer) so we don't need matched codecs
-    or timebases. Slower than `-c copy` but robust to mixed sources.
+    or timebases. `[*:a:0?]` makes audio optional on each input, so a
+    silent intro doesn't bring the whole filter graph down.
     """
     args = [
         "ffmpeg",
@@ -116,39 +124,3 @@ def _concat_intro(intro: Path, slice_: Path, dest: Path) -> None:
         str(dest),
     ]
     subprocess.run(args, check=True)
-
-
-def _drawtext_filter(name: str | None, title: str | None) -> str | None:
-    """Build a `drawtext` filter that places speaker name + title in the
-    bottom-left corner. Returns None when there's nothing to draw."""
-    if not name and not title:
-        return None
-    if not Path(_FONT).exists():
-        # No font installed — fall back to no overlay rather than failing
-        # the whole render. Dockerfile installs fonts-dejavu-core to fix.
-        return None
-
-    lines: list[str] = []
-    if name:
-        lines.append(
-            f"drawtext=fontfile={_FONT}:text='{_escape(name)}'"
-            f":x=48:y=h-tw-56:fontsize=34:fontcolor=white"
-            f":box=1:boxcolor=black@0.45:boxborderw=12"
-        )
-    if title:
-        lines.append(
-            f"drawtext=fontfile={_FONT}:text='{_escape(title)}'"
-            f":x=48:y=h-th-24:fontsize=22:fontcolor=white@0.85"
-            f":box=1:boxcolor=black@0.35:boxborderw=10"
-        )
-    return ",".join(lines)
-
-
-def _escape(text: str) -> str:
-    """Escape characters that drawtext treats as control chars."""
-    return (
-        text.replace("\\", "\\\\")
-        .replace(":", r"\:")
-        .replace("'", r"\'")
-        .replace("%", r"\%")
-    )
