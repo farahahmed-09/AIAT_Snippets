@@ -3,6 +3,7 @@ from fastapi import APIRouter, status
 from app.api.deps import CurrentUserDep
 from app.schemas.session import Session, SessionCreate, SessionUpdate
 from app.services import sessions
+from app.workers.tasks import process_session as process_session_task
 
 # Routes here are mounted at /sessions/* — project-scoped collection
 # endpoints (list/create) live under /projects/{project_id}/sessions
@@ -25,6 +26,14 @@ def update_session(
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(session_id: int, user: CurrentUserDep) -> None:
     sessions.delete(user.id, session_id)
+
+
+@router.post("/{session_id}/process")
+def trigger_processing(session_id: int, user: CurrentUserDep) -> dict[str, str]:
+    # Auth gate — raises 404/403 if the caller can't write this session.
+    sessions._fetch_session_with_access(user.id, session_id, write=True)
+    task = process_session_task.delay(session_id)
+    return {"task_id": task.id, "status": "queued"}
 
 
 # Project-scoped collection — kept in this module but mounted at

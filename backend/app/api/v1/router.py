@@ -29,6 +29,11 @@ api_router.include_router(
 )
 api_router.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 api_router.include_router(
+    snippets.session_scoped_router,
+    prefix="/sessions/{session_id}/snippets",
+    tags=["snippets"],
+)
+api_router.include_router(
     intro_assets.router, prefix="/intro-assets", tags=["intro-assets"]
 )
 api_router.include_router(snippets.router, prefix="/snippets", tags=["snippets"])
