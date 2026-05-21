@@ -1,0 +1,3 @@
+[submodule "backend/ai_core"]
+	path = backend/ai_core
+	url = https://github.com/Sprints-AI-Learning/ai-core.git
